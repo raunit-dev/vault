@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 use anchor_lang::{
     prelude::*,
     system_program::{transfer, Transfer},
@@ -17,13 +18,14 @@ pub mod vault {
 
     pub fn deposit(ctx: Context<Payment>, amount: u64) -> Result<()> {
         ctx.accounts.deposit(amount);
-        Ok(())
-    }
-
-    pub fn withdraw(ctx: Context<Payment>, amount: u64) -> Result<()> {
         ctx.accounts.withdraw(amount);
         Ok(())
     }
+
+    // pub fn withdraw(ctx: Context<Payment>, amount: u64) -> Result<()> {
+       
+    //     Ok(())
+    // }
 
     pub fn closeaccount(ctx: Context<CloseAccount>) -> Result<()> {
         ctx.accounts.close();
