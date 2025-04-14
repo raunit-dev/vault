@@ -21,6 +21,10 @@ pub mod vault {
 
     pub fn deposit(ctx: Context<Payment>, amount: u64) -> Result<()> {
         ctx.accounts.deposit(amount)?;
+        Ok(())
+    }
+
+    pub fn withdraw(ctx: Context<Payment>, amount: u64) -> Result <()> {
         ctx.accounts.withdraw(amount)?;
         Ok(())
     }
@@ -45,10 +49,10 @@ pub struct Initialize<'info> {
         seeds = [b"state", user.key().as_ref()],
         bump
     )]
-    pub state: Account<'info, VaultState>,
+    pub vault_state: Account<'info, VaultState>,
 
     #[account(
-        seeds = [b"vault", state.key().as_ref()],
+        seeds = [b"vault", vault_state.key().as_ref()],
         bump
     )]
     pub vault: SystemAccount<'info>,
@@ -58,8 +62,8 @@ pub struct Initialize<'info> {
 
 impl<'info> Initialize<'info> {
     pub fn initialize(&mut self, bumps: &InitializeBumps) -> Result<()> {
-        self.state.vault_bump = bumps.vault;
-        self.state.state_bump = bumps.state;
+        self.vault_state.vault_bump = bumps.vault;
+        self.vault_state.state_bump = bumps.vault_state;
         Ok(())
     }
 }
@@ -126,11 +130,18 @@ pub struct CloseAccount<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
+    #[account(
+        mut,
+        seeds = [b"state", user.key().as_ref()],
+        bump = vault_state.state_bump,
+        close = user
+    )]
+
     pub vault_state: Account<'info, VaultState>,
 
     #[account(
         mut,
-        seeds = [b"state", user.key().as_ref()],
+        seeds = [b"vault", user.key().as_ref()],
         bump = vault_state.vault_bump
     )]
     pub vault: SystemAccount<'info>,
