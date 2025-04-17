@@ -48,7 +48,7 @@ pub struct Initialize<'info> {
         seeds = [b"state", user.key().as_ref()],
         bump
     )]
-    pub vault_state: Account<'info, VaultState>,
+    pub state: Account<'info, VaultState>,
 
     #[account(
         seeds = [b"vault", user.key().as_ref()],
@@ -60,10 +60,9 @@ pub struct Initialize<'info> {
 }
 
 impl<'info> Initialize<'info> {
-    pub fn initialize(&mut self, bumps: &InitializeBumps) -> Result<()> {
-        self.vault_state.vault_bump = bumps.vault;
-        self.vault_state.state_bump = bumps.vault_state;
-        Ok(())
+    pub fn initialize(&mut self, bump: &InitializeBumps) -> Result<()> {
+         self.state.set_inner(VaultState { state_bump: bump.state , vault_bump: bump.vault });
+         Ok(())
     }
 }
 
