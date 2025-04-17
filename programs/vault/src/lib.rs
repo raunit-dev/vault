@@ -15,23 +15,22 @@ pub mod vault {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts.initialize(&ctx.bumps)?;
-        Ok(())
+        ctx.accounts.initialize(&ctx.bumps)
     }
 
     pub fn deposit(ctx: Context<Payment>, amount: u64) -> Result<()> {
-        ctx.accounts.deposit(amount)?;
-        Ok(())
+        ctx.accounts.deposit(amount)
+
     }
 
     pub fn withdraw(ctx: Context<Payment>, amount: u64) -> Result <()> {
-        ctx.accounts.withdraw(amount)?;
-        Ok(())
+        ctx.accounts.withdraw(amount)
+
     }
 
     pub fn closeaccount(ctx: Context<CloseAccount>) -> Result<()> {
-        ctx.accounts.close()?;
-        Ok(())
+        ctx.accounts.close()
+
     }
 }
 
@@ -98,8 +97,7 @@ impl<'info> Payment<'info> {
             to: self.vault.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        transfer(cpi_ctx, amount)?;
-        Ok(())
+        transfer(cpi_ctx, amount)
     }
 
     pub fn withdraw(&mut self, amount: u64) -> Result<()> {
@@ -118,8 +116,8 @@ impl<'info> Payment<'info> {
         let signer_seeds = &[&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-        transfer(cpi_ctx, amount)?;
-        Ok(())
+        transfer(cpi_ctx, amount)
+
     }
 }
 
@@ -166,7 +164,7 @@ impl<'info> CloseAccount<'info> {
         let signer_seeds = &[&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-        transfer(cpi_ctx, self.vault.lamports())?;
-        Ok(())
+        transfer(cpi_ctx, self.vault.lamports())
+
     }
 }
