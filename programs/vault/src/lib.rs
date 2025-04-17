@@ -61,8 +61,11 @@ pub struct Initialize<'info> {
 
 impl<'info> Initialize<'info> {
     pub fn initialize(&mut self, bump: &InitializeBumps) -> Result<()> {
-         self.state.set_inner(VaultState { state_bump: bump.state , vault_bump: bump.vault });
-         Ok(())
+        self.state.set_inner(VaultState {
+            state_bump: bump.state,
+            vault_bump: bump.vault,
+        });
+        Ok(())
     }
 }
 
@@ -130,16 +133,16 @@ pub struct CloseAccount<'info> {
     #[account(
         mut,
         seeds = [b"state", user.key().as_ref()],
-        bump = vault_state.state_bump,
+        bump = state.state_bump,
         close = user
     )]
 
-    pub vault_state: Account<'info, VaultState>,
+    pub state: Account<'info, VaultState>,
 
     #[account(
         mut,
         seeds = [b"vault", user.key().as_ref()],
-        bump = vault_state.vault_bump
+        bump = state.vault_bump
     )]
     pub vault: SystemAccount<'info>,
 
@@ -158,7 +161,7 @@ impl<'info> CloseAccount<'info> {
         let seeds = &[
             b"vault",
             user_key.as_ref(),
-            &[self.vault_state.vault_bump],
+            &[self.state.vault_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
