@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 
+use crate::state::vault::VaultState;
+
+
 #[derive(Accounts)]
 pub struct CloseAccount<'info> {
     #[account(mut)]

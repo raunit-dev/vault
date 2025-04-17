@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-pub mod state;
-use state::VaultState;
+
+use crate::state::vault::VaultState;
 
 
 #[derive(Accounts)]
