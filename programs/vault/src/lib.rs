@@ -1,14 +1,13 @@
 #![allow(unexpected_cfgs)]
 
-use anchor_lang::{
-    prelude::*,
-    system_program::{transfer, Transfer},
-};
+use anchor_lang::prelude::*;
 
 pub mod state;
 pub mod instructions;
 
-use state::VaultState;
+pub use instructions::*;
+pub use state::*;
+
 
 
 declare_id!("HGw8u4hSsrvJPkNL9FhwuTb6SR6YYLjESFATAyQAYRZN");

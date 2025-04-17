@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::state::vault::VaultState;
+use anchor_lang::system_program::{transfer, Transfer};
 
 #[derive(Accounts)]
 pub struct Payment<'info> {
@@ -8,14 +10,14 @@ pub struct Payment<'info> {
 
     #[account(
         seeds = [b"state", user.key().as_ref()],
-        bump = vault_state.state_bump
+        bump = state.state_bump
     )]
-    pub vault_state: Account<'info, VaultState>,
+    pub state: Account<'info, VaultState>,
 
     #[account(
         mut,
-        seeds = [b"vault", vault_state.key().as_ref()],
-        bump = vault_state.vault_bump
+        seeds = [b"vault", state.key().as_ref()],
+        bump = state.vault_bump
     )]
     pub vault: SystemAccount<'info>,
 
@@ -44,7 +46,7 @@ impl<'info> Payment<'info> {
         let seeds = &[
             b"vault",
             user_key.as_ref(),
-            &[self.vault_state.vault_bump],
+            &[self.state.vault_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
