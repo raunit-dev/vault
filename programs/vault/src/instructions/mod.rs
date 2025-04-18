@@ -1,7 +1,7 @@
 pub mod initialize;
+pub use initialize::*;
 pub mod payment;
+pub use payment::*;
 pub mod close;
+pub use close::*;
 
-pub use initialize::Initialize;
-pub use payment::Payment;
-pub use close::CloseAccount;
