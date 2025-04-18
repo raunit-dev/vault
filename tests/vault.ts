@@ -90,7 +90,7 @@ describe("vault", () => {
 
   it("Close vault", async () => {
     const tx = await program.methods
-      .close()
+      .closeaccount()
       .accountsPartial({
         user: provider.wallet.publicKey,
         state,

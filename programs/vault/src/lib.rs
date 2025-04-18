@@ -5,8 +5,10 @@ use anchor_lang::prelude::*;
 pub mod state;
 pub mod instructions;
 
-pub use instructions::*;
+
+
 pub use state::*;
+pub use instructions::*;
 
 
 
