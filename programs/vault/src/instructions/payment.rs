@@ -9,14 +9,14 @@ pub struct Payment<'info> {
     pub user: Signer<'info>,
 
     #[account(
-        seeds = [b"state", user.key().as_ref()],
+        seeds = [&b"state"[..], user.key().as_ref()],
         bump = state.state_bump
     )]
     pub state: Account<'info, VaultState>,
 
     #[account(
         mut,
-        seeds = [b"vault", state.key().as_ref()],
+        seeds = [&b"vault"[..], user.key().as_ref()],
         bump = state.vault_bump
     )]
     pub vault: SystemAccount<'info>,

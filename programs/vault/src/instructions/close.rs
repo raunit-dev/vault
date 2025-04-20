@@ -11,7 +11,7 @@ pub struct CloseAccount<'info> {
 
     #[account(
         mut,
-        seeds = [b"state", user.key().as_ref()],
+        seeds = [&b"state"[..], user.key().as_ref()],
         bump = state.state_bump,
         close = user
     )]
@@ -20,7 +20,7 @@ pub struct CloseAccount<'info> {
 
     #[account(
         mut,
-        seeds = [b"vault", user.key().as_ref()],
+        seeds = [&b"vault"[..], user.key().as_ref()],
         bump = state.vault_bump
     )]
     pub vault: SystemAccount<'info>,

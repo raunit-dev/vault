@@ -12,7 +12,7 @@ pub use instructions::*;
 
 
 
-declare_id!("HGw8u4hSsrvJPkNL9FhwuTb6SR6YYLjESFATAyQAYRZN");
+declare_id!("FZpvAPGzk1xZNTcsfMa9LpUG4XQcZBGaTfgGXWN7qRaR");
 
 #[program]
 pub mod vault {

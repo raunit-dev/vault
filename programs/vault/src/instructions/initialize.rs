@@ -12,13 +12,13 @@ pub struct Initialize<'info> {
         init,
         payer = user,
         space = 8 + 2,
-        seeds = [b"state", user.key().as_ref()],
+        seeds = [&b"state"[..], user.key().as_ref()],
         bump
     )]
     pub state: Account<'info, VaultState>,
 
     #[account(
-        seeds = [b"vault", user.key().as_ref()],
+        seeds = [&b"vault"[..], user.key().as_ref()],
         bump
     )]
     pub vault: SystemAccount<'info>,
