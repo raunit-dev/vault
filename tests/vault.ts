@@ -3,41 +3,31 @@ import { Program } from "@coral-xyz/anchor";
 import { Vault } from "../target/types/vault";
 
 describe("vault", () => {
-  // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env(); 
+  const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.vault as Program<Vault>;
 
-  // const vaultState = anchor.web3.PublicKey.findProgramAddressSync(
-  //   [Buffer.from("state"), provider.publicKey.toBytes()],
-  //   program.programId
-  // )[0];
-  // const vault = anchor.web3.PublicKey.findProgramAddressSync(
-  //   [Buffer.from("vault"), vaultState.toBytes()],
-  //   program.programId
-  // )[0];
   const [state, stateBump] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("state"), provider.wallet.publicKey.toBuffer()],
     program.programId
   );
-  
+
   const [vault, vaultBump] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("vault"), provider.wallet.publicKey.toBuffer()],
     program.programId
   );
 
   it("Is initialized!", async () => {
-    // Add your test here.
     const tx = await program.methods
-    .initialize()
-    .accountsPartial({
-      user: provider.wallet.publicKey,
-      state,
-      vault,
-      systemProgram: anchor.web3.SystemProgram.programId,
-    })
-    .rpc();
+      .initialize()
+      .accountsPartial({
+        user: provider.wallet.publicKey,
+        state,
+        vault,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
 
     console.log("\nYour transaction signature", tx);
     console.log(
@@ -46,8 +36,6 @@ describe("vault", () => {
     );
   });
 
-  
-
   it("Deposit 2 SOL", async () => {
     const tx = await program.methods
       .deposit(new anchor.BN(2 * anchor.web3.LAMPORTS_PER_SOL))
@@ -55,19 +43,19 @@ describe("vault", () => {
         user: provider.wallet.publicKey,
         state,
         vault,
-        systemProgram: anchor.web3.SystemProgram.programId
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
-      console.log("\nYour transaction signature", tx);
-      console.log(
-        "Your vault info",
-        await provider.connection.getAccountInfo(vault)
-      );
-      console.log(
-        "Your vault balance",
-        (await provider.connection.getBalance(vault)).toString()
-      );
+    console.log("\nYour transaction signature", tx);
+    console.log(
+      "Your vault info",
+      await provider.connection.getAccountInfo(vault)
+    );
+    console.log(
+      "Your vault balance",
+      (await provider.connection.getBalance(vault)).toString()
+    );
   });
 
   it("Withdraw 1 SOL", async () => {
@@ -77,7 +65,7 @@ describe("vault", () => {
         user: provider.wallet.publicKey,
         state,
         vault,
-        systemProgram: anchor.web3.SystemProgram.programId
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
@@ -95,15 +83,14 @@ describe("vault", () => {
         user: provider.wallet.publicKey,
         state,
         vault,
-        systemProgram: anchor.web3.SystemProgram.programId
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
-      console.log("\nYour transaction signature", tx);
-      console.log(
-        "Your vault info",
-        await provider.connection.getAccountInfo(vault)
-      );
+    console.log("\nYour transaction signature", tx);
+    console.log(
+      "Your vault info",
+      await provider.connection.getAccountInfo(vault)
+    );
   });
-
 });
