@@ -8,15 +8,15 @@ describe("vault", () => {
 
   const program = anchor.workspace.vault as Program<Vault>;
 
-  const [state, stateBump] = anchor.web3.PublicKey.findProgramAddressSync(
+  const state = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("state"), provider.wallet.publicKey.toBuffer()],
     program.programId
-  );
+  )[0];
 
-  const [vault, vaultBump] = anchor.web3.PublicKey.findProgramAddressSync(
+  const vault = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("vault"), provider.wallet.publicKey.toBuffer()],
     program.programId
-  );
+  )[0];
 
   it("Is initialized!", async () => {
     const tx = await program.methods
