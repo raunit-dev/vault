@@ -1,0 +1,29 @@
+import { createFromRoot } from "codama";
+import { rootNodeFromAnchor } from "@codama/nodes-from-anchor";
+import { renderVisitor } from "@codama/renderers-rust";
+import { readFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const projectRoot = join(__dirname, "..");
+
+// Load the Anchor IDL
+const idlPath = join(projectRoot, "target/idl/exo_anchor_template.json");
+const idl = JSON.parse(readFileSync(idlPath, "utf-8"));
+
+// Create Codama tree from Anchor IDL
+const codama = createFromRoot(rootNodeFromAnchor(idl));
+
+// Generate Rust client
+const rustClientPath = join(projectRoot, "clients/rust/src/generated");
+
+codama.accept(
+  renderVisitor(rustClientPath, {
+    crateFolder: join(projectRoot, "clients/rust"),
+    formatCode: true,
+    toolchain: "+nightly",
+  })
+);
+
+console.log("Rust client generated successfully at:", rustClientPath);

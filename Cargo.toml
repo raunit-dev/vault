@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "clients/rust",
+    "integration-tests",
+    "programs/*"
+]
+resolver = "2"
+
+[workspace.dependencies]
+anchor-lang = "0.31.1"
+borsh = "1.5"
+litesvm = "0.3"
+solana-sdk = "2.0"
+sha2 = "0.10"
+# Pin blake3 to fix edition error
+blake3 = "=1.5.5"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
