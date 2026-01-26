@@ -53,6 +53,9 @@ pub fn handler<'info>(ctx: Context<CreateVault>, args: VaultArgs) -> Result<()> 
     if let Some(FeeType::Percentage { bps }) = args.deposit_fees {
         require!(bps <= 10_000, VaultProgramError::FeeBPSLimitReached);
     }
+    if let Some(FeeType::Percentage { bps }) = args.withdraw_fees {
+        require!(bps <= 10_000, VaultProgramError::FeeBPSLimitReached);
+    }
     ctx.accounts.vault.set_inner(VaultConfig {
         asset_mint_address: ctx.accounts.asset_mint.key(),
         share_mint_address: ctx.accounts.share_mint.key(),
