@@ -6,5 +6,5 @@
 
 use solana_pubkey::{pubkey, Pubkey};
 
-/// `exo_anchor_template` program ID.
-pub const EXO_ANCHOR_TEMPLATE_ID: Pubkey = pubkey!("ANXYYTDoEHooFjaN8M8pDHRj87d945Bj5QvAFGcpqakw");
+/// `vault` program ID.
+pub const VAULT_ID: Pubkey = pubkey!("ANXYYTDoEHooFjaN8M8pDHRj87d945Bj5QvAFGcpqakw");

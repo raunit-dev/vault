@@ -1,0 +1,37 @@
+use anchor_lang::prelude::*;
+
+/// The fee types:
+/// FixedAmount: a fixed fee is applied (ex 0.1 asset)
+/// Percentage: the fee is a % of the transfer amount
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, InitSpace)]
+pub enum FeeType {
+    NoFee,
+    FixedAmount { amount: u64 },
+    Percentage { bps: u16 },
+}
+
+/// Core state of the Vault account necessary for common
+/// logic across configuration types.
+#[account]
+#[derive(InitSpace)]
+pub struct VaultConfig {
+    pub asset_mint_address: Pubkey,
+    /// share mint address
+    pub share_mint_address: Pubkey,
+    /// vault_token_account
+    pub vault_token_account: Pubkey,
+    /// authority that can sign permissioned instructions
+    pub authority: Pubkey,
+    /// initial price
+    pub initial_price: u64,
+    /// deposit fees
+    pub deposit_fees: Option<FeeType>,
+    /// withdraw fees
+    pub withdraw_fees: Option<FeeType>,
+    /// paused
+    pub paused: bool,
+    /// max balance allowed in vault
+    pub vault_asset_cap: Option<u64>,
+    /// virtual vault asset balance
+    pub total_asset_balance: u64,
+}

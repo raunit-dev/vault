@@ -12,7 +12,7 @@ pub mod sdk {
 
     /// Convert the program ID to a solana_sdk::pubkey::Pubkey
     pub fn program_id() -> solana_sdk::pubkey::Pubkey {
-        solana_sdk::pubkey::Pubkey::new_from_array(EXO_ANCHOR_TEMPLATE_ID.to_bytes())
+        solana_sdk::pubkey::Pubkey::new_from_array(VAULT_ID.to_bytes())
     }
 
     /// Extension trait for converting instructions to solana-sdk types
