@@ -12,7 +12,7 @@ use anchor_spl::{
 
 pub fn create_vault(
     svm: &mut LiteSVM,
-    authority: Keypair,
+    authority: &Keypair,
     payer: Keypair,
     asset_mint: Pubkey,
     share_mint: Pubkey,

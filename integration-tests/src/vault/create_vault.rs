@@ -1,8 +1,13 @@
 use litesvm::LiteSVM;
-use solana_sdk::{signature::Keypair, signer::Signer};
+use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use vault_client::{sdk::program_id, Pubkey};
 
-use crate::vault::helper_functions::{create_mint, create_vault};
+use crate::vault::{
+    self, create_vault,
+    helper_functions::{create_mint, create_vault},
+};
+
+use vault_client::VaultConfig;
 
 #[test]
 fn test_initialize() {
@@ -40,7 +45,7 @@ fn test_initialize() {
     );
     create_vault(
         &mut svm,
-        authority,
+        &authority,
         payer,
         asset_mint.pubkey(),
         share_mint.pubkey(),
@@ -53,4 +58,16 @@ fn test_initialize() {
         .get_account(&vault_pubkey)
         .expect("Vault account should exist");
     assert!(!vault_account.data.is_empty(), "Vault should have data");
+
+    let vault_config = VaultConfig::from_bytes(vault_account.data()).unwrap();
+    assert_eq!(vault_config.authority, authority.pubkey());
+    assert_eq!(vault_config.asset_mint_address, asset_mint.pubkey());
+    assert_eq!(vault_config.share_mint_address, share_mint.pubkey());
+    assert_eq!(vault_config.deposit_fees, None);
+    assert_eq!(vault_config.withdraw_fees, None);
+    assert_eq!(vault_config.initial_price, 0);
+    assert_eq!(vault_config.paused, true);
+    assert_eq!(vault_config.total_asset_balance, 0);
+    assert_eq!(vault_config.vault_asset_cap, None);
+    assert_eq!(vault_config.vault_token_account, reserve_pubkey);
 }
