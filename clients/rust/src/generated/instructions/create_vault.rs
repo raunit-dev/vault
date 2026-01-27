@@ -101,6 +101,7 @@ impl Default for CreateVaultInstructionData {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CreateVaultInstructionArgs {
     pub authority: Pubkey,
+    pub initial_price: u64,
     pub deposit_fees: Option<FeeType>,
     pub withdraw_fees: Option<FeeType>,
     pub vault_asset_cap: Option<u64>,
@@ -133,6 +134,7 @@ pub struct CreateVaultBuilder {
     token_program: Option<solana_pubkey::Pubkey>,
     system_program: Option<solana_pubkey::Pubkey>,
     authority: Option<Pubkey>,
+    initial_price: Option<u64>,
     deposit_fees: Option<FeeType>,
     withdraw_fees: Option<FeeType>,
     vault_asset_cap: Option<u64>,
@@ -194,6 +196,12 @@ impl CreateVaultBuilder {
         self
     }
 
+    #[inline(always)]
+    pub fn initial_price(&mut self, initial_price: u64) -> &mut Self {
+        self.initial_price = Some(initial_price);
+        self
+    }
+
     /// `[optional argument]`
     #[inline(always)]
     pub fn deposit_fees(&mut self, deposit_fees: FeeType) -> &mut Self {
@@ -249,6 +257,10 @@ impl CreateVaultBuilder {
         };
         let args = CreateVaultInstructionArgs {
             authority: self.authority.clone().expect("authority is not set"),
+            initial_price: self
+                .initial_price
+                .clone()
+                .expect("initial_price is not set"),
             deposit_fees: self.deposit_fees.clone(),
             withdraw_fees: self.withdraw_fees.clone(),
             vault_asset_cap: self.vault_asset_cap.clone(),
@@ -430,6 +442,7 @@ impl<'a, 'b> CreateVaultCpiBuilder<'a, 'b> {
             token_program: None,
             system_program: None,
             authority: None,
+            initial_price: None,
             deposit_fees: None,
             withdraw_fees: None,
             vault_asset_cap: None,
@@ -498,6 +511,12 @@ impl<'a, 'b> CreateVaultCpiBuilder<'a, 'b> {
         self
     }
 
+    #[inline(always)]
+    pub fn initial_price(&mut self, initial_price: u64) -> &mut Self {
+        self.instruction.initial_price = Some(initial_price);
+        self
+    }
+
     /// `[optional argument]`
     #[inline(always)]
     pub fn deposit_fees(&mut self, deposit_fees: FeeType) -> &mut Self {
@@ -563,6 +582,11 @@ impl<'a, 'b> CreateVaultCpiBuilder<'a, 'b> {
                 .authority
                 .clone()
                 .expect("authority is not set"),
+            initial_price: self
+                .instruction
+                .initial_price
+                .clone()
+                .expect("initial_price is not set"),
             deposit_fees: self.instruction.deposit_fees.clone(),
             withdraw_fees: self.instruction.withdraw_fees.clone(),
             vault_asset_cap: self.instruction.vault_asset_cap.clone(),
@@ -609,6 +633,7 @@ struct CreateVaultCpiBuilderInstruction<'a, 'b> {
     token_program: Option<&'b solana_account_info::AccountInfo<'a>>,
     system_program: Option<&'b solana_account_info::AccountInfo<'a>>,
     authority: Option<Pubkey>,
+    initial_price: Option<u64>,
     deposit_fees: Option<FeeType>,
     withdraw_fees: Option<FeeType>,
     vault_asset_cap: Option<u64>,
