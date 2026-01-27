@@ -12,6 +12,7 @@ pub mod vault {
 
     use super::*;
 
+    /// Initialize an atomic vault.
     pub fn create_vault(ctx: Context<CreateVault>, args: VaultArgs) -> Result<()> {
         instructions::create_vault::handler(ctx, args)
     }

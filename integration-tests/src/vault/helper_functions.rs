@@ -39,12 +39,7 @@ pub fn create_vault(
         .into_sdk_instruction();
 
     let blockhash = svm.latest_blockhash();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&payer.pubkey()),
-        &[&authority, &payer],
-        blockhash,
-    );
+    let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer], blockhash);
 
     return svm.send_transaction(tx);
 }
