@@ -2,7 +2,6 @@
   "license": "ISC",
   "scripts": {
     "generate:clients": "node scripts/generate-clients.mjs",
-    "rename": "./scripts/rename-project.sh",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },

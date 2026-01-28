@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, "..");
 
 // Load the Anchor IDL
-const idlPath = join(projectRoot, "target/idl/exo_anchor_template.json");
+const idlPath = join(projectRoot, "target/idl/vault.json");
 const idl = JSON.parse(readFileSync(idlPath, "utf-8"));
 
 // Create Codama tree from Anchor IDL
