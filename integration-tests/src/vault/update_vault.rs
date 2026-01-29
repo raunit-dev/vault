@@ -2,20 +2,21 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use vault_client::{sdk::program_id, FeeType, Pubkey, VaultConfig};
 
-use crate::vault::{
-    constants::{RESERVE_CONFIG_SEED, VAULT_CONFIG_SEED},
-    helper_functions::{assert_error_code, create_mint, create_vault},
-};
+use crate::vault::helper_functions::{assert_error_code, create_mint, create_vault, update_vault};
 use test_case::test_case;
 
-#[test_case(FeeType::NoFee, FeeType::NoFee, 100_000_000,true; "No Fees")]
-#[test_case(FeeType::Percentage { bps: 10_001 }, FeeType::NoFee,100_000_000, false; "Deposit fee limit exceeded")]
-#[test_case(FeeType::Percentage { bps: 9000 }, FeeType::Percentage { bps: 10_001 },100_000_000,false; "Withdraw fee limit exceeded")]
-fn test_create_vault(
+#[test_case(FeeType::NoFee, FeeType::NoFee, true,  FeeType::Percentage { bps: 10_000 },FeeType::Percentage { bps: 10_000 }, false, 100_000,Keypair::new().pubkey(); "No Fees, Change fee percentage, unpause and vault cap")]
+#[test_case(FeeType::NoFee, FeeType::NoFee, true,  FeeType::FixedAmount { amount: 10_000 },FeeType::Percentage { bps: 10_000 }, false, 100_000,Keypair::new().pubkey(); "No Fees, Change fee fixed amount, unpause and vault cap")]
+#[test_case(FeeType::NoFee, FeeType::NoFee, false,  FeeType::Percentage { bps: 10_001 },FeeType::Percentage { bps: 10_000 }, false, 100_000,Keypair::new().pubkey(); "No Fees, Change fee, Error from exceeded fee")]
+fn test_update_vault(
     deposit_fee: FeeType,
     withdraw_fee: FeeType,
-    initial_price: u64,
     should_succeed: bool,
+    updated_deposit_fee: FeeType,
+    updated_withdraw_fee: FeeType,
+    updated_paused_status: bool,
+    updated_vault_asset_cap: u64,
+    updated_authority: Pubkey,
 ) {
     let mut svm = LiteSVM::new();
 
@@ -35,7 +36,7 @@ fn test_create_vault(
     create_mint(&mut svm, &mint_authority, &share_mint);
     let (reserve_pubkey, _) = Pubkey::find_program_address(
         &[
-            RESERVE_CONFIG_SEED,
+            b"reserve",
             asset_mint.pubkey().as_ref(),
             share_mint.pubkey().as_ref(),
         ],
@@ -43,13 +44,13 @@ fn test_create_vault(
     );
     let (vault_pubkey, _) = Pubkey::find_program_address(
         &[
-            VAULT_CONFIG_SEED,
+            b"vault",
             asset_mint.pubkey().as_ref(),
             share_mint.pubkey().as_ref(),
         ],
         &vault_client::sdk::program_id(),
     );
-    let result = create_vault(
+    let _ = create_vault(
         &mut svm,
         &authority,
         &payer,
@@ -60,33 +61,48 @@ fn test_create_vault(
         deposit_fee.clone(),
         withdraw_fee.clone(),
         0,
-        initial_price,
+        100_000,
     );
+
+    let update_result = update_vault(
+        &mut svm,
+        &authority,
+        asset_mint.pubkey(),
+        share_mint.pubkey(),
+        vault_pubkey,
+        updated_deposit_fee.clone(),
+        updated_withdraw_fee.clone(),
+        updated_vault_asset_cap,
+        updated_paused_status,
+        updated_authority,
+    );
+
     assert_eq!(
-        result.is_ok(),
+        update_result.is_ok(),
         should_succeed,
         "Unexpected result for test case"
     );
+
     if should_succeed {
-        // Verify vault was created
+        // Verify vault was updated
         let vault_account = svm
             .get_account(&vault_pubkey)
             .expect("Vault account should exist");
         assert!(!vault_account.data.is_empty(), "Vault should have data");
 
         let vault_config = VaultConfig::from_bytes(vault_account.data()).unwrap();
-        assert_eq!(vault_config.authority, authority.pubkey());
+        assert_eq!(vault_config.authority, updated_authority);
         assert_eq!(vault_config.asset_mint_address, asset_mint.pubkey());
         assert_eq!(vault_config.share_mint_address, share_mint.pubkey());
-        assert_eq!(vault_config.deposit_fees, deposit_fee);
-        assert_eq!(vault_config.withdraw_fees, withdraw_fee);
-        assert_eq!(vault_config.initial_price, initial_price);
-        assert_eq!(vault_config.paused, true);
+        assert_eq!(vault_config.deposit_fees, updated_deposit_fee);
+        assert_eq!(vault_config.withdraw_fees, updated_withdraw_fee);
+        assert_eq!(vault_config.initial_price, 100_000);
+        assert_eq!(vault_config.paused, updated_paused_status);
         assert_eq!(vault_config.total_asset_balance, 0);
-        assert_eq!(vault_config.vault_asset_cap, 0);
+        assert_eq!(vault_config.vault_asset_cap, updated_vault_asset_cap);
         assert_eq!(vault_config.vault_token_account, reserve_pubkey);
     } else {
-        let failed_tx = result.unwrap_err();
+        let failed_tx = update_result.unwrap_err();
         assert_error_code(
             &failed_tx,
             6000,
