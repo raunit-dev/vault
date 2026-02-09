@@ -1,3 +1,4 @@
+use anchor_spl::token;
 use litesvm::LiteSVM;
 use solana_sdk::{signature::Keypair, signer::Signer};
 use vault_client::{sdk::program_id, FeeType, Pubkey};
@@ -23,10 +24,13 @@ fn test_close_vault(supply_is_zero: bool, reserve_is_empty: bool) {
     let mint_authority = Keypair::new();
     let asset_mint = Keypair::new();
     let share_mint = Keypair::new();
+    let fee_recipient = Keypair::new();
+
     svm.airdrop(&authority.pubkey(), 1_000_000_000).unwrap();
     svm.airdrop(&payer.pubkey(), 1_000_000_000).unwrap();
     svm.airdrop(&mint_authority.pubkey(), 1_000_000_000)
         .unwrap();
+    svm.airdrop(&fee_recipient.pubkey(), 1_000_000_000).unwrap();
 
     create_mint(&mut svm, &mint_authority, &asset_mint);
     create_mint(&mut svm, &mint_authority, &share_mint);
@@ -47,13 +51,14 @@ fn test_close_vault(supply_is_zero: bool, reserve_is_empty: bool) {
         &vault_client::sdk::program_id(),
     );
     if !supply_is_zero {
-        let share_account = create_ata(&mut svm, &payer, &share_mint.pubkey());
+        let share_account = create_ata(&mut svm, &payer, &share_mint.pubkey(), &token::ID);
         helper_mint_to(
             &mut svm,
             &share_mint.pubkey(),
             &share_account,
             &mint_authority,
             100_000,
+            &token::ID,
         );
     }
 
@@ -61,6 +66,7 @@ fn test_close_vault(supply_is_zero: bool, reserve_is_empty: bool) {
         &mut svm,
         &authority,
         &payer,
+        &mint_authority,
         asset_mint.pubkey(),
         share_mint.pubkey(),
         reserve_pubkey,
@@ -69,6 +75,9 @@ fn test_close_vault(supply_is_zero: bool, reserve_is_empty: bool) {
         FeeType::NoFee,
         0,
         100_000,
+        fee_recipient.pubkey(),
+        token::ID,
+        token::ID,
     );
 
     if !reserve_is_empty {
@@ -78,6 +87,7 @@ fn test_close_vault(supply_is_zero: bool, reserve_is_empty: bool) {
             &reserve_pubkey,
             &mint_authority,
             100_000,
+            &token::ID,
         );
     }
 

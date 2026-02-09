@@ -15,12 +15,30 @@ pub enum VaultError {
     /// 6001 - The provided signer is not allowed to execute this instruction.
     #[error("The provided signer is not allowed to execute this instruction.")]
     UnauthorizedSigner = 0x1771,
-    /// 6002 - The provided share supply should be zero.
+    /// 6002 - Something happened while performing an arithmetic operation.
+    #[error("Something happened while performing an arithmetic operation.")]
+    ArithmeticError = 0x1772,
+    /// 6003 - The vault is paused.
+    #[error("The vault is paused.")]
+    PausedVault = 0x1773,
+    /// 6004 - The vault max asset cap has been exceeded.
+    #[error("The vault max asset cap has been exceeded.")]
+    MaxVaultAssetCapExceeded = 0x1774,
+    /// 6005 - The provided mint supply should be zero.
+    #[error("The provided mint supply should be zero.")]
+    MintSupplyShouldBeZero = 0x1775,
+    /// 6006 - The provided share supply should be zero.
     #[error("The provided share supply should be zero.")]
-    ShareSupplyShouldBeZero = 0x1772,
-    /// 6003 - The provided vault reserve should be empty in order to close it.
+    ShareSupplyShouldBeZero = 0x1776,
+    /// 6007 - The provided vault reserve should be empty in order to close it.
     #[error("The provided vault reserve should be empty in order to close it.")]
-    VaultShouldBeEmpty = 0x1773,
+    VaultShouldBeEmpty = 0x1777,
+    /// 6008 - Deposit amount too small to mint shares
+    #[error("Deposit amount too small to mint shares")]
+    InsufficientDepositAmount = 0x1778,
+    /// 6009 - Initial price has to be bigger than 0
+    #[error("Initial price has to be bigger than 0")]
+    InvalidInitialPrice = 0x1779,
 }
 
 impl From<VaultError> for solana_program_error::ProgramError {

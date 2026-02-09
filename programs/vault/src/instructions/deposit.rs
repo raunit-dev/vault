@@ -1,0 +1,172 @@
+use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{self, mint_to, Mint, MintTo, TokenAccount, TokenInterface, TransferChecked},
+};
+
+use crate::{
+    error::VaultProgramError,
+    state::{Rounding, VaultConfig, RESERVE_CONFIG_SEED, VAULT_CONFIG_SEED},
+};
+
+#[derive(Accounts)]
+pub struct Deposit<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub asset_mint: InterfaceAccount<'info, Mint>,
+
+    // Not checking the mint authority is expected behaviour
+    #[account(mut)]
+    pub share_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        token::mint = asset_mint,
+        token::authority = vault,
+        token::token_program = asset_token_program,
+        seeds = [RESERVE_CONFIG_SEED, asset_mint.key().as_ref(), share_mint.key().as_ref()],
+        bump,
+    )]
+    pub reserve: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [VAULT_CONFIG_SEED, asset_mint.key().as_ref(), share_mint.key().as_ref()],
+        bump
+    )]
+    pub vault: Account<'info, VaultConfig>,
+
+    #[account(
+        mut,
+        associated_token::authority = vault.fee_recipient,
+        associated_token::mint = asset_mint,
+        associated_token::token_program = asset_token_program,
+    )]
+    pub fee_recipient: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        associated_token::authority = user,
+        associated_token::mint = asset_mint,
+        associated_token::token_program = asset_token_program,
+    )]
+    pub user_assets_account: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        associated_token::authority = user,
+        associated_token::mint = share_mint,
+        associated_token::token_program = share_token_program,
+    )]
+    pub user_shares_account: InterfaceAccount<'info, TokenAccount>,
+
+    pub asset_token_program: Interface<'info, TokenInterface>,
+    pub share_token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+impl<'info> Deposit<'info> {
+    pub fn transfer_asset_token_fee_to_fee_recipient(&mut self, fee: u64) -> Result<()> {
+        let fee_recipient_transfer_cpi_accounts = TransferChecked {
+            from: self.user_assets_account.to_account_info(),
+            mint: self.asset_mint.to_account_info(),
+            to: self.fee_recipient.to_account_info(),
+            authority: self.user.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(
+            self.asset_token_program.to_account_info(),
+            fee_recipient_transfer_cpi_accounts,
+        );
+
+        token_interface::transfer_checked(cpi_ctx, fee, self.asset_mint.decimals)
+    }
+
+    pub fn transfer_asset_token_to_vault(&mut self, amount: u64) -> Result<()> {
+        let vault_transfer_cpi_accounts = TransferChecked {
+            from: self.user_assets_account.to_account_info(),
+            mint: self.asset_mint.to_account_info(),
+            to: self.reserve.to_account_info(),
+            authority: self.user.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(
+            self.asset_token_program.to_account_info(),
+            vault_transfer_cpi_accounts,
+        );
+        token_interface::transfer_checked(cpi_ctx, amount, self.asset_mint.decimals)
+    }
+
+    pub fn mint_shares_to_user(&mut self, amount: u64) -> Result<()> {
+        let asset_mint = self.asset_mint.key();
+        let share_mint = self.share_mint.key();
+        let mint_to_cpi_accounts = MintTo {
+            mint: self.share_mint.to_account_info(),
+            to: self.user_shares_account.to_account_info(),
+            authority: self.vault.to_account_info(),
+        };
+
+        let seeds: &[&[&[u8]]] = &[&[
+            VAULT_CONFIG_SEED,
+            asset_mint.as_ref(),
+            share_mint.as_ref(),
+            &[self.vault.bump],
+        ]];
+
+        let mint_cpi_ctx = CpiContext::new_with_signer(
+            self.share_token_program.to_account_info(),
+            mint_to_cpi_accounts,
+            seeds,
+        );
+        mint_to(mint_cpi_ctx, amount)
+    }
+}
+pub fn handler<'info>(ctx: Context<Deposit>, assets: u64) -> Result<()> {
+    require!(!ctx.accounts.vault.paused, VaultProgramError::PausedVault);
+    let fee = ctx.accounts.vault.get_deposit_fee(assets)?;
+    // current vault amount
+    let reserve_amount_before = ctx.accounts.reserve.amount;
+    // transfer assets in case there are transfer fees (Token2022)
+    let remaining_amount = assets
+        .checked_sub(fee)
+        .ok_or(VaultProgramError::ArithmeticError)?;
+    ctx.accounts
+        .transfer_asset_token_to_vault(remaining_amount)?;
+    ctx.accounts.reserve.reload()?;
+
+    let updated_reserve_amount = ctx.accounts.reserve.amount;
+
+    let actual_transferred_amount = updated_reserve_amount
+        .checked_sub(reserve_amount_before)
+        .ok_or(VaultProgramError::ArithmeticError)?;
+
+    let new_total_asset_balance = ctx
+        .accounts
+        .vault
+        .total_asset_balance
+        .checked_add(actual_transferred_amount)
+        .ok_or(VaultProgramError::ArithmeticError)?;
+
+    require!(
+        new_total_asset_balance <= ctx.accounts.vault.vault_asset_cap,
+        VaultProgramError::MaxVaultAssetCapExceeded
+    );
+
+    let shares = ctx.accounts.vault.get_shares_from_assets(
+        ctx.accounts.share_mint.supply,
+        actual_transferred_amount,
+        Rounding::Down,
+    )?;
+
+    if shares == 0 {
+        return Err(VaultProgramError::InsufficientDepositAmount.into());
+    }
+    ctx.accounts
+        .vault
+        .increase_asset_supply(actual_transferred_amount)?;
+    ctx.accounts
+        .transfer_asset_token_fee_to_fee_recipient(fee)?;
+    ctx.accounts.mint_shares_to_user(shares)?;
+    Ok(())
+}
