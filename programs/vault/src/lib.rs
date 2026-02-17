@@ -55,10 +55,16 @@ pub mod vault {
     ///
     /// # Arguments
     /// * `assets` - The amount of asset tokens to deposit into the vault
-    pub fn deposit(ctx: Context<Deposit>, assets: u64) -> Result<()> {
+    pub fn deposit(ctx: Context<DepositAndMint>, assets: u64) -> Result<()> {
         instructions::deposit::handler(ctx, assets)
     }
 
+    /// Mint shares from the atomic vault.
+    /// # Arguments
+    /// * `shares` - The amount of shares to mint to the user
+    pub fn mint(ctx: Context<DepositAndMint>, shares: u64) -> Result<()> {
+        instructions::mint::handler(ctx, shares)
+    }
     /// Withdraws assets from the vault by burning the required amount of shares.
     /// Burns shares from the user's shares Token account and transfers the requested amount of
     /// asset tokens from the vault's reserve account to the user's assets ATA.
