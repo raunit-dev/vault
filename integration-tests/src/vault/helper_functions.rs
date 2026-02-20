@@ -159,6 +159,7 @@ pub fn deposit(
     user_assets_account: Pubkey,
     user_shares_account: Pubkey,
     assets_amount: u64,
+    min_shares: u64,
     asset_token_program: Pubkey,
     share_token_program: Pubkey,
 ) -> Result<TransactionMetadata, FailedTransactionMetadata> {
@@ -172,6 +173,7 @@ pub fn deposit(
         .user_assets_account(user_assets_account)
         .user_shares_account(user_shares_account)
         .assets(assets_amount)
+        .min_shares(min_shares)
         .asset_token_program(asset_token_program)
         .share_token_program(share_token_program)
         .instruction()
@@ -193,6 +195,7 @@ pub fn mint(
     user_assets_account: Pubkey,
     user_shares_account: Pubkey,
     shares_amount: u64,
+    max_assets: u64,
     asset_token_program: Pubkey,
     share_token_program: Pubkey,
 ) -> Result<TransactionMetadata, FailedTransactionMetadata> {
@@ -206,6 +209,7 @@ pub fn mint(
         .user_assets_account(user_assets_account)
         .user_shares_account(user_shares_account)
         .shares(shares_amount)
+        .max_assets(max_assets)
         .asset_token_program(asset_token_program)
         .share_token_program(share_token_program)
         .instruction()
@@ -227,6 +231,7 @@ pub fn withdraw(
     user_assets_account: Pubkey,
     user_shares_account: Pubkey,
     assets_amount: u64,
+    max_shares: u64,
     asset_token_program: Pubkey,
     share_token_program: Pubkey,
 ) -> Result<TransactionMetadata, FailedTransactionMetadata> {
@@ -240,6 +245,7 @@ pub fn withdraw(
         .user_assets_account(user_assets_account)
         .user_shares_account(user_shares_account)
         .assets(assets_amount)
+        .max_shares(max_shares)
         .asset_token_program(asset_token_program)
         .share_token_program(share_token_program)
         .instruction()
@@ -261,6 +267,7 @@ pub fn redeem(
     user_assets_account: Pubkey,
     user_shares_account: Pubkey,
     shares_amount: u64,
+    min_assets: u64,
     asset_token_program: Pubkey,
     share_token_program: Pubkey,
 ) -> Result<TransactionMetadata, FailedTransactionMetadata> {
@@ -274,6 +281,7 @@ pub fn redeem(
         .user_assets_account(user_assets_account)
         .user_shares_account(user_shares_account)
         .shares(shares_amount)
+        .min_assets(min_assets)
         .asset_token_program(asset_token_program)
         .share_token_program(share_token_program)
         .instruction()
@@ -430,7 +438,7 @@ pub fn set_up_vault(
         ],
         &vault_client::sdk::program_id(),
     );
-    let result = create_vault(
+    create_vault(
         svm,
         &authority,
         &payer,
@@ -446,7 +454,8 @@ pub fn set_up_vault(
         fee_recipient.pubkey(),
         asset_token_program,
         share_token_program,
-    );
+    )
+    .expect("Failed to create vault");
     let _ = update_vault(
         svm,
         &authority,
@@ -563,18 +572,4 @@ fn transfer_fee_from_params(amount: u64, bps: u16, max_fee: u64) -> u64 {
 /// calculates the amount to receive after transfer fees (from token2022) are substracted
 pub fn recv_amount_from_params(amount: u64, bps: u16, max_fee: u64) -> u64 {
     amount.saturating_sub(transfer_fee_from_params(amount, bps, max_fee))
-}
-
-pub fn get_assets_from_shares(total_assets: u64, supply: u64, share_amount: u64) -> u64 {
-    let numerator = u128::from(share_amount)
-        .checked_mul(u128::from(total_assets))
-        .unwrap();
-
-    let denominator = u128::from(supply.checked_add(1).unwrap());
-
-    return numerator
-        .checked_div(denominator)
-        .unwrap()
-        .try_into()
-        .unwrap();
 }
