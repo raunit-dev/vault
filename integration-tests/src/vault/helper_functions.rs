@@ -12,7 +12,7 @@ use solana_sdk::{
 };
 use vault_client::{
     sdk::IntoSdkInstruction, CloseVaultBuilder, CreateVaultBuilder, DepositBuilder, FeeType,
-    MintBuilder, Pubkey, RedeemBuilder, UpdateVaultBuilder, WithdrawBuilder,
+    MintBuilder, Pubkey, RedeemBuilder, UpdateVaultBuilder, VaultConfig, WithdrawBuilder,
 };
 
 use anchor_spl::{
@@ -86,7 +86,6 @@ pub fn close_vault(
     svm: &mut LiteSVM,
     authority: &Keypair,
     payer: &Keypair,
-    asset_mint: Pubkey,
     share_mint: Pubkey,
     reserve: Pubkey,
     vault: Pubkey,
@@ -94,7 +93,6 @@ pub fn close_vault(
     let ix = CloseVaultBuilder::new()
         .authority(authority.pubkey())
         .payer(payer.pubkey())
-        .asset_mint(asset_mint)
         .share_mint(share_mint)
         .reserve(reserve)
         .vault(vault)
@@ -115,7 +113,6 @@ pub fn close_vault(
 pub fn update_vault(
     svm: &mut LiteSVM,
     authority: &Keypair,
-    asset_mint: Pubkey,
     share_mint: Pubkey,
     vault: Pubkey,
     deposit_fees: FeeType,
@@ -126,7 +123,6 @@ pub fn update_vault(
 ) -> Result<TransactionMetadata, FailedTransactionMetadata> {
     let ix = UpdateVaultBuilder::new()
         .authority(authority.pubkey())
-        .asset_mint(asset_mint)
         .share_mint(share_mint)
         .vault(vault)
         .deposit_fees(deposit_fees)
@@ -423,19 +419,11 @@ pub fn set_up_vault(
     svm.airdrop(&fee_recipient.pubkey(), 1_000_000_000).unwrap();
 
     let (reserve_pubkey, _) = Pubkey::find_program_address(
-        &[
-            b"reserve",
-            asset_mint.pubkey().as_ref(),
-            share_mint.pubkey().as_ref(),
-        ],
+        &[b"reserve", share_mint.pubkey().as_ref()],
         &vault_client::sdk::program_id(),
     );
     let (vault_pubkey, _) = Pubkey::find_program_address(
-        &[
-            b"vault",
-            asset_mint.pubkey().as_ref(),
-            share_mint.pubkey().as_ref(),
-        ],
+        &[b"vault", share_mint.pubkey().as_ref()],
         &vault_client::sdk::program_id(),
     );
     create_vault(
@@ -459,7 +447,6 @@ pub fn set_up_vault(
     let _ = update_vault(
         svm,
         &authority,
-        asset_mint.pubkey(),
         share_mint.pubkey(),
         vault_pubkey,
         deposit_fees.clone(),
@@ -572,4 +559,17 @@ fn transfer_fee_from_params(amount: u64, bps: u16, max_fee: u64) -> u64 {
 /// calculates the amount to receive after transfer fees (from token2022) are substracted
 pub fn recv_amount_from_params(amount: u64, bps: u16, max_fee: u64) -> u64 {
     amount.saturating_sub(transfer_fee_from_params(amount, bps, max_fee))
+}
+
+/// gets the assets held in VaultConfig's reserve account
+pub fn get_vault_asset_balance(svm: &LiteSVM, vault_pubkey: &Pubkey) -> u64 {
+    let vault = svm
+        .get_account(&vault_pubkey)
+        .expect("Vault account should exist");
+    let vault_config = VaultConfig::from_bytes(vault.data()).unwrap();
+
+    let reserve_acc = svm
+        .get_account(&vault_config.vault_token_account)
+        .expect("could not fetch vault_token_account");
+    get_token_account_amount(&reserve_acc)
 }

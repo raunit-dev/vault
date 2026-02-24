@@ -14,8 +14,8 @@ use spl_token_2022::state::Account as TokenAccount2022;
 use vault_client::{sdk::program_id, FeeType, VaultConfig};
 
 use crate::vault::helper_functions::{
-    assert_error_code, create_ata, create_mint, create_mint_with_transfer_fee, helper_mint_to,
-    mint, set_up_vault,
+    assert_error_code, create_ata, create_mint, create_mint_with_transfer_fee,
+    get_vault_asset_balance, helper_mint_to, mint, recv_amount_from_params, set_up_vault,
 };
 
 #[test]
@@ -239,11 +239,9 @@ fn test_mint_vault_with_transfer_fees() {
         .unwrap()
         .amount;
     assert_eq!(user_share_balance_before, 0);
-    let vault = svm
-        .get_account(&vault_pubkey)
-        .expect("Vault account should exist");
-    let vault_config = VaultConfig::from_bytes(vault.data()).unwrap();
-    assert_eq!(vault_config.total_asset_balance, 0);
+
+    let vault_asset_balance = get_vault_asset_balance(&svm, &vault_pubkey);
+    assert_eq!(vault_asset_balance, 0);
     let mint_amount = 500_000;
     let result = mint(
         &mut svm,
@@ -343,13 +341,20 @@ fn test_mint_vault_with_transfer_fees() {
         .expect("Vault account should exist");
     let vault_config = VaultConfig::from_bytes(vault.data()).unwrap();
 
-    let expected_assets: u64 = (mint_amount as u128)
+    let assets: u64 = (mint_amount as u128)
         .checked_mul(vault_config.initial_price as u128)
         .unwrap()
         .try_into()
         .unwrap();
 
-    assert_eq!(vault_config.total_asset_balance, expected_assets);
+    // Token2022 withholds its fee on the gross amount (assets + our estimate),
+    // so the reserve receives slightly less than `assets`
+    let fee_estimate = (assets as u128 * transfer_fee as u128).div_ceil(10_000) as u64;
+    let gross = assets + fee_estimate;
+    let expected_assets = recv_amount_from_params(gross, transfer_fee, 1000);
+
+    let vault_asset_balance = get_vault_asset_balance(&svm, &vault_pubkey);
+    assert_eq!(vault_asset_balance, expected_assets);
 }
 
 #[test]
@@ -415,9 +420,7 @@ fn test_mint_vault_slippage_protection_fails() {
     let reserve_before = TokenAccount::unpack(svm.get_account(&reserve_pubkey).unwrap().data())
         .unwrap()
         .amount;
-    let vault_before = VaultConfig::from_bytes(svm.get_account(&vault_pubkey).unwrap().data())
-        .unwrap()
-        .total_asset_balance;
+    let vault_asset_balance_before = get_vault_asset_balance(&svm, &vault_pubkey);
 
     let result = mint(
         &mut svm,
@@ -444,11 +447,9 @@ fn test_mint_vault_slippage_protection_fails() {
     let reserve_after = TokenAccount::unpack(svm.get_account(&reserve_pubkey).unwrap().data())
         .unwrap()
         .amount;
-    let vault_after = VaultConfig::from_bytes(svm.get_account(&vault_pubkey).unwrap().data())
-        .unwrap()
-        .total_asset_balance;
+    let vault_asset_balance_after = get_vault_asset_balance(&svm, &vault_pubkey);
 
     assert_eq!(user_share_after, user_share_before);
     assert_eq!(reserve_after, reserve_before);
-    assert_eq!(vault_after, vault_before);
+    assert_eq!(vault_asset_balance_after, vault_asset_balance_before);
 }

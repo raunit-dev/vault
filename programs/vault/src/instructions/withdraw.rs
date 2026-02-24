@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token_interface::{self, burn, Burn, Mint, TokenAccount, TokenInterface, TransferChecked},
+use anchor_spl::token_interface::{
+    self, burn, Burn, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
 use crate::{
@@ -28,7 +27,7 @@ pub struct Withdraw<'info> {
         token::mint = asset_mint,
         token::authority = vault,
         token::token_program = asset_token_program,
-        seeds = [RESERVE_CONFIG_SEED, asset_mint.key().as_ref(), share_mint.key().as_ref()],
+        seeds = [RESERVE_CONFIG_SEED, share_mint.key().as_ref()],
         bump,
     )]
     pub reserve: InterfaceAccount<'info, TokenAccount>,
@@ -36,7 +35,7 @@ pub struct Withdraw<'info> {
     /// Vault configuration account (PDA)
     #[account(
         mut,
-        seeds = [VAULT_CONFIG_SEED, asset_mint.key().as_ref(), share_mint.key().as_ref()],
+        seeds = [VAULT_CONFIG_SEED, share_mint.key().as_ref()],
         bump
     )]
     pub vault: Account<'info, VaultConfig>,
@@ -44,38 +43,36 @@ pub struct Withdraw<'info> {
     /// Fee recipient token account
     #[account(
         mut,
-        associated_token::authority = vault.fee_recipient,
-        associated_token::mint = asset_mint,
-        associated_token::token_program = asset_token_program,
+        token::authority = vault.fee_recipient,
+        token::mint = asset_mint,
+        token::token_program = asset_token_program,
     )]
     pub fee_recipient: InterfaceAccount<'info, TokenAccount>,
 
     /// User's asset token account
     #[account(
         mut,
-        associated_token::authority = user,
-        associated_token::mint = asset_mint,
-        associated_token::token_program = asset_token_program,
+        token::authority = user,
+        token::mint = asset_mint,
+        token::token_program = asset_token_program,
     )]
     pub user_assets_account: InterfaceAccount<'info, TokenAccount>,
 
     /// User's share token account
     #[account(
         mut,
-        associated_token::authority = user,
-        associated_token::mint = share_mint,
-        associated_token::token_program = share_token_program,
+        token::authority = user,
+        token::mint = share_mint,
+        token::token_program = share_token_program,
     )]
     pub user_shares_account: InterfaceAccount<'info, TokenAccount>,
 
     pub share_token_program: Interface<'info, TokenInterface>,
     pub asset_token_program: Interface<'info, TokenInterface>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> Withdraw<'info> {
     pub fn transfer_assets_to_fee_recipient(&mut self, fee: u64) -> Result<()> {
-        let asset_mint = self.asset_mint.key();
         let share_mint = self.share_mint.key();
 
         let cpi_accounts = TransferChecked {
@@ -85,12 +82,7 @@ impl<'info> Withdraw<'info> {
             authority: self.vault.to_account_info(),
         };
 
-        let seeds: &[&[&[u8]]] = &[&[
-            VAULT_CONFIG_SEED,
-            asset_mint.as_ref(),
-            share_mint.as_ref(),
-            &[self.vault.bump],
-        ]];
+        let seeds: &[&[&[u8]]] = &[&[VAULT_CONFIG_SEED, share_mint.as_ref(), &[self.vault.bump]]];
 
         let cpi_ctx = CpiContext::new_with_signer(
             self.asset_token_program.to_account_info(),
@@ -103,7 +95,6 @@ impl<'info> Withdraw<'info> {
 
     /// Transfers `asset_amount` tokens to the user token account
     pub fn transfer_assets_to_user(&mut self, asset_amount: u64) -> Result<()> {
-        let asset_mint = self.asset_mint.key();
         let share_mint = self.share_mint.key();
 
         let cpi_accounts = TransferChecked {
@@ -113,12 +104,7 @@ impl<'info> Withdraw<'info> {
             authority: self.vault.to_account_info(),
         };
 
-        let seeds: &[&[&[u8]]] = &[&[
-            VAULT_CONFIG_SEED,
-            asset_mint.as_ref(),
-            share_mint.as_ref(),
-            &[self.vault.bump],
-        ]];
+        let seeds: &[&[&[u8]]] = &[&[VAULT_CONFIG_SEED, share_mint.as_ref(), &[self.vault.bump]]];
 
         let cpi_ctx = CpiContext::new_with_signer(
             self.asset_token_program.to_account_info(),
@@ -159,6 +145,7 @@ pub fn handler<'info>(ctx: Context<Withdraw>, assets: u64, max_shares: u64) -> R
         .ok_or(VaultProgramError::ArithmeticError)?;
 
     let shares_to_burn = ctx.accounts.vault.get_shares_from_assets(
+        ctx.accounts.reserve.amount,
         ctx.accounts.share_mint.supply,
         amount_with_fee,
         // This ensures the user provides (burns) enough shares
@@ -185,9 +172,6 @@ pub fn handler<'info>(ctx: Context<Withdraw>, assets: u64, max_shares: u64) -> R
 
     // transfer from vault to user
     ctx.accounts.transfer_assets_to_user(amount_assets_out)?;
-
-    // decrease vault assets
-    ctx.accounts.vault.decrease_asset_supply(amount_with_fee)?;
 
     Ok(())
 }

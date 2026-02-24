@@ -38,19 +38,11 @@ fn test_update_vault(
     create_mint(&mut svm, &mint_authority, &asset_mint);
     create_mint(&mut svm, &mint_authority, &share_mint);
     let (reserve_pubkey, _) = Pubkey::find_program_address(
-        &[
-            b"reserve",
-            asset_mint.pubkey().as_ref(),
-            share_mint.pubkey().as_ref(),
-        ],
+        &[b"reserve", share_mint.pubkey().as_ref()],
         &vault_client::sdk::program_id(),
     );
     let (vault_pubkey, _) = Pubkey::find_program_address(
-        &[
-            b"vault",
-            asset_mint.pubkey().as_ref(),
-            share_mint.pubkey().as_ref(),
-        ],
+        &[b"vault", share_mint.pubkey().as_ref()],
         &vault_client::sdk::program_id(),
     );
     let _ = create_vault(
@@ -74,7 +66,6 @@ fn test_update_vault(
     let update_result = update_vault(
         &mut svm,
         &authority,
-        asset_mint.pubkey(),
         share_mint.pubkey(),
         vault_pubkey,
         updated_deposit_fee.clone(),
@@ -105,7 +96,6 @@ fn test_update_vault(
         assert_eq!(vault_config.withdraw_fees, updated_withdraw_fee);
         assert_eq!(vault_config.initial_price, 100_000);
         assert_eq!(vault_config.paused, updated_paused_status);
-        assert_eq!(vault_config.total_asset_balance, 0);
         assert_eq!(vault_config.vault_asset_cap, updated_vault_asset_cap);
         assert_eq!(vault_config.vault_token_account, reserve_pubkey);
     } else {
