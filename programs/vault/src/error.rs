@@ -55,4 +55,22 @@ pub enum VaultProgramError {
 
     #[msg("The extension is not initialized.")]
     UninitializedExtension,
+
+    #[msg("The provided vault and mint mismatch.")]
+    VaultShareMintMismatch,
+
+    #[msg("The vault NAV is stale. Please update the NAV value before depositing.")]
+    StaleVaultNav,
+
+    #[msg("This instruction needs the hook extension to be initialized.")]
+    HookExtensionNotInitialized,
+
+    #[msg("The provided optional account is empty.")]
+    OptionalAccountIsEmpty,
+
+    #[msg("The returned data is invalid.")]
+    InvalidReturnedData,
+
+    #[msg("The provided extra meta accounts pubkey does not match")]
+    InvalidAccountData,
 }

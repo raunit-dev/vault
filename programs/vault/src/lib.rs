@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 pub mod error;
+pub mod extensions;
 pub mod instructions;
 pub mod state;
 
@@ -56,7 +57,11 @@ pub mod vault {
     /// # Arguments
     /// * `assets` - The amount of asset tokens to deposit into the vault
     /// * `min_shares` - Minimum number of shares the user must receive (slippage check)
-    pub fn deposit(ctx: Context<DepositAndMint>, assets: u64, min_shares: u64) -> Result<()> {
+    pub fn deposit<'info>(
+        ctx: Context<'_, '_, '_, 'info, DepositAndMint<'info>>,
+        assets: u64,
+        min_shares: u64,
+    ) -> Result<()> {
         instructions::deposit::handler(ctx, assets, min_shares)
     }
 
@@ -124,6 +129,16 @@ pub mod vault {
         args: InitWithdrawalFeesArgs,
     ) -> Result<()> {
         instructions::initialize_withdrawal_fees::handler(ctx, args)
+    }
+
+    /// Initializes the deposit hook extension for a vault (one-time, pre-init only).
+    /// Stores the provided extension inside `vault.extensions` as `VaultExtension::DepositHook`.
+    /// Only the vault authority can call this.
+    pub fn initialize_deposit_hook(
+        ctx: Context<InitializeDepositHook>,
+        hook_program: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_deposit_hook_extension::handler(ctx, hook_program)
     }
 
     /// Updates the deposit fee configuration for an already-initialized deposit fee extension.

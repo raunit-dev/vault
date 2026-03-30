@@ -1,3 +1,4 @@
+use hook_client::InitializeDepositExtraMetaAccountsBuilder;
 use litesvm::{
     types::{FailedTransactionMetadata, TransactionMetadata},
     LiteSVM,
@@ -8,13 +9,14 @@ use solana_sdk::{
     signature::Keypair,
     signer::Signer,
     system_instruction::create_account,
+    system_program,
     transaction::Transaction,
 };
 use vault_client::{
-    sdk::IntoSdkInstruction, CloseVaultBuilder, CreateVaultBuilder, DepositBuilder, FeeType,
-    InitializeDepositFeesBuilder, InitializeVaultBuilder, InitializeWithdrawalFeesBuilder,
-    MintBuilder, Pubkey, RedeemBuilder, UpdateDepositFeesBuilder, UpdateVaultBuilder,
-    UpdateWithdrawalFeesBuilder, VaultConfig, WithdrawBuilder,
+    sdk::IntoSdkInstruction as _, CloseVaultBuilder, CreateVaultBuilder, DepositBuilder, FeeType,
+    InitializeDepositFeesBuilder, InitializeDepositHookBuilder, InitializeVaultBuilder,
+    InitializeWithdrawalFeesBuilder, MintBuilder, Pubkey, RedeemBuilder, UpdateDepositFeesBuilder,
+    UpdateVaultBuilder, UpdateWithdrawalFeesBuilder, VaultConfig, WithdrawBuilder,
 };
 
 use anchor_spl::{
@@ -152,6 +154,11 @@ pub fn deposit(
     min_shares: u64,
     asset_token_program: Pubkey,
     share_token_program: Pubkey,
+    hook_program: Pubkey,
+    protocol: Option<Pubkey>,
+    nav_return_data: Option<Pubkey>,
+    instructions: Option<Pubkey>,
+    extra_metas: Option<Pubkey>,
 ) -> Result<TransactionMetadata, FailedTransactionMetadata> {
     let ix = DepositBuilder::new()
         .user(user.pubkey())
@@ -166,6 +173,9 @@ pub fn deposit(
         .min_shares(min_shares)
         .asset_token_program(asset_token_program)
         .share_token_program(share_token_program)
+        .hook_program(Some(hook_program))
+        .protocol(protocol)
+        .extra_metas(extra_metas)
         .instruction()
         .into_sdk_instruction();
 
@@ -202,6 +212,7 @@ pub fn mint(
         .max_assets(max_assets)
         .asset_token_program(asset_token_program)
         .share_token_program(share_token_program)
+        .hook_program(Some(system_program::ID))
         .instruction()
         .into_sdk_instruction();
 
@@ -710,6 +721,58 @@ fn transfer_fee_from_params(amount: u64, bps: u16, max_fee: u64) -> u64 {
 /// calculates the amount to receive after transfer fees (from token2022) are substracted
 pub fn recv_amount_from_params(amount: u64, bps: u16, max_fee: u64) -> u64 {
     amount.saturating_sub(transfer_fee_from_params(amount, bps, max_fee))
+}
+
+pub fn init_deposit_hook(
+    svm: &mut LiteSVM,
+    authority: &Keypair,
+    share_mint: &Pubkey,
+    vault: &Pubkey,
+    hook_program: Pubkey,
+) -> Result<TransactionMetadata, FailedTransactionMetadata> {
+    let ix = InitializeDepositHookBuilder::new()
+        .authority(authority.pubkey())
+        .share_mint(*share_mint)
+        .vault(*vault)
+        .hook_program(hook_program)
+        .instruction()
+        .into_sdk_instruction();
+
+    let blockhash = svm.latest_blockhash();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&authority.pubkey()),
+        &[&authority],
+        blockhash,
+    );
+
+    return svm.send_transaction(tx);
+}
+
+pub fn init_deposit_extra_meta_accounts(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    asset_mint: &Pubkey,
+    share_mint: &Pubkey,
+    _vault: &Pubkey,
+) -> Result<TransactionMetadata, FailedTransactionMetadata> {
+    let (extra_metas, _) = Pubkey::find_program_address(
+        &[b"extra_account_metas", b"deposit", share_mint.as_ref()],
+        &hook_client::sdk::program_id(),
+    );
+
+    let ix = InitializeDepositExtraMetaAccountsBuilder::new()
+        .payer(payer.pubkey())
+        .asset_mint(*asset_mint)
+        .share_mint_address(*share_mint)
+        .extra_metas(extra_metas)
+        .instruction()
+        .into_sdk_instruction();
+
+    let blockhash = svm.latest_blockhash();
+    let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[payer], blockhash);
+
+    return svm.send_transaction(tx);
 }
 
 /// gets the assets held in VaultConfig's reserve account
