@@ -7,13 +7,13 @@ use anchor_spl::token_interface::Mint;
 use crate::{
     errors::HookProgramError,
     state::{
-        get_nav, protocol_deposit, validate_protocols, VaultAssociatedProtocols,
+        get_nav, protocol_withdraw, validate_protocols, VaultAssociatedProtocols,
         VAULT_ASSOCIATED_PROTOCOLS_SEED,
     },
 };
 
 #[derive(Accounts)]
-pub struct ExecuteDepositHook<'info> {
+pub struct ExecuteWithdrawHook<'info> {
     // This should be the vault authority
     pub signer: Signer<'info>,
     pub share_mint: InterfaceAccount<'info, Mint>,
@@ -31,44 +31,23 @@ pub struct ExecuteDepositHook<'info> {
     pub associated_protocols_info: Account<'info, VaultAssociatedProtocols>,
 }
 
-impl<'info> ExecuteDepositHook<'info> {
-    pub fn validate_protocols(&self) -> Result<()> {
-        let protocols = &self.associated_protocols_info.protocols;
-
-        require!(
-            protocols.len() >= 2,
-            HookProgramError::InsufficientAssociatedProtocols
-        );
-
-        require!(
-            protocols.contains(&vault::id()),
-            HookProgramError::ProtocolNotFound
-        );
-
-        require!(
-            protocols.contains(&self.protocol.key()),
-            HookProgramError::ProtocolNotFound
-        );
-
-        Ok(())
-    }
-
-    pub fn invoke_deposit(
+impl<'info> ExecuteWithdrawHook<'info> {
+    pub fn invoke_withdraw(
         &self,
         additional_accounts: &[AccountInfo<'info>],
-        deposit_amount: u64,
+        amount: u64,
     ) -> Result<()> {
         let downstream_vault = additional_accounts
             .first()
             .ok_or(error!(HookProgramError::InvalidAccountData))?;
 
-        let instruction = protocol_deposit(
+        let instruction = protocol_withdraw(
             &self.protocol.key(),
             self.signer.key,
             &self.share_mint.key(),
             &downstream_vault.key(),
             &self.system_program.key(),
-            deposit_amount,
+            amount,
         );
 
         let mut cpi_account_infos = vec![
@@ -85,24 +64,22 @@ impl<'info> ExecuteDepositHook<'info> {
 }
 
 pub fn handler<'info>(
-    ctx: Context<'_, '_, '_, 'info, ExecuteDepositHook<'info>>,
-    deposit_amount: u64,
+    ctx: Context<'_, '_, '_, 'info, ExecuteWithdrawHook<'info>>,
+    amount: u64,
 ) -> Result<()> {
     validate_protocols(
         &ctx.accounts.associated_protocols_info.protocols,
         ctx.accounts.protocol.key,
     )?;
     ctx.accounts
-        .invoke_deposit(ctx.remaining_accounts, deposit_amount)?;
-    let mut total = get_nav(
+        .invoke_withdraw(ctx.remaining_accounts, amount)?;
+    let total = get_nav(
         &ctx.accounts.associated_protocols_info.protocols,
         &ctx.accounts.share_mint.key(),
         ctx.remaining_accounts,
         ctx.program_id,
     )?;
-    total = total
-        .checked_sub(deposit_amount)
-        .ok_or(HookProgramError::ArithmeticError)?;
+    msg!("Nav values is: {:?}", total);
     let data = total.try_to_vec()?;
     set_return_data(&data);
     Ok(())

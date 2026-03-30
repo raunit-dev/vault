@@ -82,7 +82,11 @@ pub mod vault {
     /// # Arguments
     /// * `assets` - The amount of asset tokens to withdraw from the vault
     /// * `max_shares` - Maximum number of shares the user is willing to burn (slippage check)
-    pub fn withdraw(ctx: Context<Withdraw>, assets: u64, max_shares: u64) -> Result<()> {
+    pub fn withdraw<'info>(
+        ctx: Context<'_, '_, '_, 'info, Withdraw<'info>>,
+        assets: u64,
+        max_shares: u64,
+    ) -> Result<()> {
         instructions::withdraw::handler(ctx, assets, max_shares)
     }
 
@@ -139,6 +143,16 @@ pub mod vault {
         hook_program: Pubkey,
     ) -> Result<()> {
         instructions::initialize_deposit_hook_extension::handler(ctx, hook_program)
+    }
+
+    /// Initializes the withdraw hook extension for a vault (one-time, pre-init only).
+    /// Stores the provided extension inside `vault.extensions` as `VaultExtension::WithdrawHook`.
+    /// Only the vault authority can call this.
+    pub fn initialize_withdraw_hook(
+        ctx: Context<InitializeWithdrawHook>,
+        hook_program: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_withdraw_hook_extension::handler(ctx, hook_program)
     }
 
     /// Updates the deposit fee configuration for an already-initialized deposit fee extension.

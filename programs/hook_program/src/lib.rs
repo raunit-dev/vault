@@ -5,7 +5,8 @@ pub mod state;
 
 declare_id!("4QabXWDFDL3cVzpabsVNCjkjgHvMAfTwPy6kCV9HiB7n");
 
-use crate::state::DepositHookInstruction;
+use crate::state::{DepositHookInstruction, WithdrawHookInstruction};
+
 use instructions::*;
 use spl_discriminator::SplDiscriminate;
 
@@ -23,6 +24,17 @@ pub mod hook_program {
         deposit_amount: u64,
     ) -> Result<()> {
         instructions::execute_deposit_hook::handler(ctx, deposit_amount)
+    }
+
+    /// Transfer hook entrypoint called by the vault program withdraw instruction.
+    /// Resolves extra account metas from the validation PDA and invokes the downstream
+    /// protocol's withdraw hook via CPI using the `WithdrawHookInstruction` discriminator.
+    #[instruction(discriminator = WithdrawHookInstruction::SPL_DISCRIMINATOR_SLICE)]
+    pub fn execute_withdraw<'info>(
+        ctx: Context<'_, '_, '_, 'info, ExecuteWithdrawHook<'info>>,
+        withdraw_amount: u64,
+    ) -> Result<()> {
+        instructions::execute_withdraw_hook::handler(ctx, withdraw_amount)
     }
 
     /// Returns the vault's current Net Asset Value (NAV) as transaction return data.
@@ -61,5 +73,12 @@ pub mod hook_program {
         ctx: Context<InitializeDepositExtraMetaAccounts>,
     ) -> Result<()> {
         instructions::initialize_deposit_extra_meta_accounts::handler(ctx)
+    }
+
+    /// Initializes the withdraw hook extra meta accounts needed for the withdraw hook
+    pub fn initialize_withdraw_extra_meta_accounts(
+        ctx: Context<InitializeWithdrawExtraMetaAccounts>,
+    ) -> Result<()> {
+        instructions::initialize_withdraw_extra_meta_accounts::handler(ctx)
     }
 }

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
-use crate::state::VAULT_PROTOCOL_DEPOSIT_SEED;
+use crate::{errors::HookProgramError, state::VAULT_PROTOCOL_DEPOSIT_SEED};
 
 #[account]
 #[derive(InitSpace)]
@@ -63,4 +63,23 @@ pub fn get_nav<'info>(
             .ok_or_else(|| error!(ErrorCode::AccountDidNotDeserialize))?;
     }
     Ok(total)
+}
+
+pub fn validate_protocols<'info>(protocols: &Vec<Pubkey>, protocol: &Pubkey) -> Result<()> {
+    require!(
+        protocols.len() >= 2,
+        HookProgramError::InsufficientAssociatedProtocols
+    );
+
+    require!(
+        protocols.contains(&vault::id()),
+        HookProgramError::ProtocolNotFound
+    );
+
+    require!(
+        protocols.contains(protocol),
+        HookProgramError::ProtocolNotFound
+    );
+
+    Ok(())
 }
