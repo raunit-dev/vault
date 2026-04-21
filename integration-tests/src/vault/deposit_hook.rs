@@ -13,7 +13,7 @@ use solana_sdk::{
     signer::Signer, transaction::Transaction,
 };
 use spl_token::state::Account as TokenAccount;
-use vault_client::{sdk::program_id, DepositBuilder, VaultConfig};
+use vault_client::{sdk::program_id, DepositBuilder, Vault};
 
 use crate::vault::helper_functions::{
     create_ata, create_mint, create_vault, get_vault_asset_balance, helper_mint_to,
@@ -25,13 +25,15 @@ fn test_deposit_with_hook() {
     let mut svm = LiteSVM::new();
 
     let vault_program_bytes = include_bytes!("../../../target/deploy/vault.so");
-    svm.add_program(program_id(), vault_program_bytes);
+    svm.add_program(program_id(), vault_program_bytes).unwrap();
 
     let hook_program_bytes = include_bytes!("../../../target/deploy/hook_program.so");
-    svm.add_program(HOOK_PROGRAM_ID, hook_program_bytes);
+    svm.add_program(HOOK_PROGRAM_ID, hook_program_bytes)
+        .unwrap();
 
     let dummy_program_bytes = include_bytes!("../../../target/deploy/dummy_protocol.so");
-    svm.add_program(dummy_program_id(), dummy_program_bytes);
+    svm.add_program(dummy_program_id(), dummy_program_bytes)
+        .unwrap();
 
     let authority = Keypair::new();
     let payer = Keypair::new();
@@ -109,7 +111,7 @@ fn test_deposit_with_hook() {
     let vault_account = svm
         .get_account(&vault_pubkey)
         .expect("vault account should exist");
-    let vault_config = VaultConfig::from_bytes(vault_account.data()).unwrap();
+    let vault_config = Vault::from_bytes(vault_account.data()).unwrap();
 
     // Initialize the vault
     init_vault(&mut svm, &authority, &share_mint.pubkey(), &vault_pubkey)
