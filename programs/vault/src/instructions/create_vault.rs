@@ -26,7 +26,10 @@ pub struct CreateVault<'info> {
 
     pub asset_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = share_mint.key() != asset_mint.key() @ VaultProgramError::MintsShouldBeDifferent,
+    )]
     pub share_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
@@ -69,19 +72,25 @@ impl<'info> CreateVault<'info> {
     }
 }
 
+/// Freeze authority is not transferred since is up to the implementator to manage it.
 pub fn handler<'info>(ctx: Context<CreateVault>, args: VaultArgs) -> Result<()> {
     require!(
         args.initial_price != 0,
         VaultProgramError::InvalidInitialPrice
     );
+    require!(
+        ctx.accounts.share_mint.supply == 0,
+        VaultProgramError::ShareMintSupplyShouldBeZero
+    );
     ctx.accounts.set_new_authority(ctx.accounts.vault.key())?;
+
     ctx.accounts.vault.set_inner(Vault {
         asset_mint_address: ctx.accounts.asset_mint.key(),
         share_mint_address: ctx.accounts.share_mint.key(),
         vault_token_account: ctx.accounts.reserve.key(),
         authority: args.authority,
         initial_price: args.initial_price,
-        paused: true,
+        paused: false,
         initialized: false,
         vault_asset_cap: args.vault_asset_cap.unwrap_or(0),
         fee_recipient: args.fee_recipient,

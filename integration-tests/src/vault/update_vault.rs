@@ -3,7 +3,7 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use vault_client::{sdk::program_id, Pubkey, Vault};
 
-use crate::vault::helper_functions::{create_mint, create_vault, update_vault};
+use crate::helper_functions::{create_mint, create_vault, update_vault};
 use test_case::test_case;
 
 #[test_case(true, false, 100_000,Keypair::new().pubkey(); "unpause and vault cap")]
@@ -29,8 +29,8 @@ fn test_update_vault(
         .unwrap();
     svm.airdrop(&fee_recipient.pubkey(), 1_000_000_000).unwrap();
 
-    create_mint(&mut svm, &mint_authority, &asset_mint);
-    create_mint(&mut svm, &mint_authority, &share_mint);
+    create_mint(&mut svm, &mint_authority, &asset_mint, &token::ID);
+    create_mint(&mut svm, &mint_authority, &share_mint, &token::ID);
     let (reserve_pubkey, _) = Pubkey::find_program_address(
         &[b"reserve", share_mint.pubkey().as_ref()],
         &vault_client::sdk::program_id(),

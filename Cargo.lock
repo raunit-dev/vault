@@ -491,6 +491,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-vault-client"
+version = "0.1.0"
+dependencies = [
+ "borsh 1.6.0",
+ "num-derive",
+ "num-traits",
+ "serde",
+ "solana-account-info",
+ "solana-cpi",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey",
+ "solana-sdk",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "async_vault"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "vault_common",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1708,6 +1734,7 @@ name = "integration-tests"
 version = "0.1.0"
 dependencies = [
  "anchor-spl",
+ "async-vault-client",
  "dummy-client",
  "hook-client",
  "litesvm",
@@ -5721,6 +5748,7 @@ dependencies = [
  "spl-discriminator",
  "spl-tlv-account-resolution 0.10.0",
  "test-case",
+ "vault_common",
 ]
 
 [[package]]
@@ -5737,6 +5765,14 @@ dependencies = [
  "solana-program-error",
  "solana-pubkey",
  "solana-sdk",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "vault_common"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
  "thiserror 2.0.18",
 ]
 

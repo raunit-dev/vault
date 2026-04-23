@@ -3,9 +3,9 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use vault_client::{sdk::program_id, Pubkey, Vault};
 
-use crate::vault::{
-    constants::{RESERVE_CONFIG_SEED, VAULT_CONFIG_SEED},
+use crate::{
     helper_functions::{create_mint, create_vault},
+    vault::constants::{RESERVE_CONFIG_SEED, VAULT_CONFIG_SEED},
 };
 
 #[test]
@@ -27,8 +27,8 @@ fn test_create_vault() {
         .unwrap();
     svm.airdrop(&fee_recipient.pubkey(), 1_000_000_000).unwrap();
 
-    create_mint(&mut svm, &mint_authority, &asset_mint);
-    create_mint(&mut svm, &mint_authority, &share_mint);
+    create_mint(&mut svm, &mint_authority, &asset_mint, &token::ID);
+    create_mint(&mut svm, &mint_authority, &share_mint, &token::ID);
     let (reserve_pubkey, _) = Pubkey::find_program_address(
         &[RESERVE_CONFIG_SEED, share_mint.pubkey().as_ref()],
         &vault_client::sdk::program_id(),
@@ -66,7 +66,7 @@ fn test_create_vault() {
     assert_eq!(vault_config.share_mint_address, share_mint.pubkey());
     assert!(vault_config.extensions.is_empty());
     assert_eq!(vault_config.initial_price, initial_price);
-    assert_eq!(vault_config.paused, true);
+    assert_eq!(vault_config.paused, false);
     assert_eq!(vault_config.vault_asset_cap, 0);
     assert_eq!(vault_config.vault_token_account, reserve_pubkey);
 }
