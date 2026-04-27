@@ -23,7 +23,8 @@ use async_vault_client::{
     sdk::program_id, CreateDepositRequestBuilder, CreateVaultBuilder as CreateAsyncVaultBuilder,
     FeeType as AsyncFeeType, InitializeDepositFeeBuilder,
     InitializeVaultBuilder as InitializeAsyncVaultBuilder, InitializeWithdrawalFeeBuilder,
-    UpdateDepositFeeBuilder, UpdateVaultNav, UpdateVaultNavBuilder, UpdateWithdrawalFeeBuilder,
+    UpdateDepositFeeBuilder, UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
+    UpdateWithdrawalFeeBuilder,
 };
 
 use anchor_spl::{
@@ -933,6 +934,31 @@ pub fn initialize_async_vault(
         .vault(vault)
         .instruction()
         .into_sdk_instruction();
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&authority.pubkey()),
+        &[authority],
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(tx)
+}
+
+pub fn update_async_vault(
+    svm: &mut LiteSVM,
+    authority: &Keypair,
+    share_mint: Pubkey,
+    vault: Pubkey,
+    paused: bool,
+) -> Result<TransactionMetadata, FailedTransactionMetadata> {
+    let mut builder = UpdateVaultAsyncBuilder::new();
+    builder
+        .authority(authority.pubkey())
+        .share_mint(share_mint)
+        .paused(paused)
+        .vault(vault);
+
+    let ix = builder.instruction().into_sdk_instruction();
 
     let tx = Transaction::new_signed_with_payer(
         &[ix],
