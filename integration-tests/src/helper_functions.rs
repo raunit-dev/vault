@@ -23,8 +23,8 @@ use async_vault_client::{
     sdk::program_id, AcceptAuthorityInvitationBuilder, CreateDepositRequestBuilder,
     CreateVaultBuilder as CreateAsyncVaultBuilder, FeeType as AsyncFeeType,
     InitializeDepositFeeBuilder, InitializeVaultBuilder as InitializeAsyncVaultBuilder,
-    InitializeWithdrawalFeeBuilder, InviteNewAuthorityBuilder, UpdateDepositFeeBuilder,
-    UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
+    InitializeWithdrawalFeeBuilder, InviteNewAuthorityBuilder, SetOperatorBuilder,
+    UpdateDepositFeeBuilder, UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
     UpdateWithdrawalFeeBuilder,
 };
 
@@ -1128,6 +1128,28 @@ pub fn setup_async_vault(
         pending_vault_pubkey,
         vault_pubkey,
     )
+}
+
+pub fn set_operator(
+    svm: &mut LiteSVM,
+    user: &Keypair,
+    operator: &Keypair,
+    request: Pubkey,
+) -> Result<TransactionMetadata, FailedTransactionMetadata> {
+    let ix = SetOperatorBuilder::new()
+        .user(user.pubkey())
+        .operator(operator.pubkey())
+        .request(request)
+        .instruction()
+        .into_sdk_instruction();
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&user.pubkey()),
+        &[user, operator],
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(tx)
 }
 
 pub fn invite_new_authority(
