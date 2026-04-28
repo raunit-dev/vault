@@ -20,10 +20,11 @@ use vault_client::{
 };
 
 use async_vault_client::{
-    sdk::program_id, CreateDepositRequestBuilder, CreateVaultBuilder as CreateAsyncVaultBuilder,
-    FeeType as AsyncFeeType, InitializeDepositFeeBuilder,
-    InitializeVaultBuilder as InitializeAsyncVaultBuilder, InitializeWithdrawalFeeBuilder,
-    UpdateDepositFeeBuilder, UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
+    sdk::program_id, AcceptAuthorityInvitationBuilder, CreateDepositRequestBuilder,
+    CreateVaultBuilder as CreateAsyncVaultBuilder, FeeType as AsyncFeeType,
+    InitializeDepositFeeBuilder, InitializeVaultBuilder as InitializeAsyncVaultBuilder,
+    InitializeWithdrawalFeeBuilder, InviteNewAuthorityBuilder, UpdateDepositFeeBuilder,
+    UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
     UpdateWithdrawalFeeBuilder,
 };
 
@@ -1129,6 +1130,28 @@ pub fn setup_async_vault(
     )
 }
 
+pub fn invite_new_authority(
+    svm: &mut LiteSVM,
+    authority: &Keypair,
+    new_authority: Pubkey,
+    vault: Pubkey,
+) -> Result<TransactionMetadata, FailedTransactionMetadata> {
+    let ix = InviteNewAuthorityBuilder::new()
+        .authority(authority.pubkey())
+        .vault(vault)
+        .new_authority(new_authority)
+        .instruction()
+        .into_sdk_instruction();
+    let blockhash = svm.latest_blockhash();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&authority.pubkey()),
+        &[authority],
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(tx)
+}
+
 pub fn update_vault_nav(
     svm: &mut LiteSVM,
     authority: &Keypair,
@@ -1147,7 +1170,27 @@ pub fn update_vault_nav(
         &[ix],
         Some(&authority.pubkey()),
         &[authority],
-        blockhash,
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(tx)
+}
+
+pub fn accept_authority_invitation(
+    svm: &mut LiteSVM,
+    new_authority: &Keypair,
+    vault: Pubkey,
+) -> Result<TransactionMetadata, FailedTransactionMetadata> {
+    let ix = AcceptAuthorityInvitationBuilder::new()
+        .new_authority(new_authority.pubkey())
+        .vault(vault)
+        .instruction()
+        .into_sdk_instruction();
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&new_authority.pubkey()),
+        &[new_authority],
+        svm.latest_blockhash(),
     );
 
     svm.send_transaction(tx)
