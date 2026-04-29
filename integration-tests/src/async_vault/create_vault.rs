@@ -89,6 +89,7 @@ fn test_create_vault(
         &[PENDING_VAULT_SEED, effective_share_mint.as_ref()],
         &program_id(),
     );
+
     let (vault_pubkey, _) = Pubkey::find_program_address(
         &[VAULT_CONFIG_SEED, effective_share_mint.as_ref()],
         &program_id(),
@@ -133,8 +134,8 @@ fn test_create_vault(
 
         let vault_config = Vault::from_bytes(vault_account.data()).unwrap();
         assert_eq!(vault_config.authority, authority.pubkey());
-        assert_eq!(vault_config.asset_mint_address, asset_mint.pubkey());
-        assert_eq!(vault_config.share_mint_address, effective_share_mint);
+        assert_eq!(vault_config.asset_mint, asset_mint.pubkey());
+        assert_eq!(vault_config.share_mint, effective_share_mint);
         assert_eq!(vault_config.vault_token_account, reserve_pubkey);
         assert_eq!(vault_config.pending_vault, pending_vault_pubkey);
         assert_eq!(vault_config.initial_price, initial_price);
@@ -230,6 +231,7 @@ fn test_create_vault_nonzero_share_mint_supply_fails() {
         &[PENDING_VAULT_SEED, share_mint.pubkey().as_ref()],
         &program_id(),
     );
+
     let (vault_pubkey, _) = Pubkey::find_program_address(
         &[VAULT_CONFIG_SEED, share_mint.pubkey().as_ref()],
         &program_id(),
