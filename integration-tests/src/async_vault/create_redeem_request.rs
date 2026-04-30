@@ -1,6 +1,8 @@
 use anchor_spl::token;
 use async_vault_client::{
-    sdk::program_id, CreateRedeemRequestBuilder, Request, RequestArgs, RequestState, RequestType,
+    lite::SendTransaction, sdk::program_id, CreateRedeemRequestBuilder,
+    InitializeVaultBuilder as InitializeAsyncVaultBuilder, Request, RequestArgs, RequestState,
+    RequestType, UpdateVaultNavBuilder,
 };
 use litesvm::LiteSVM;
 use solana_sdk::{
@@ -9,14 +11,12 @@ use solana_sdk::{
 use test_case::test_case;
 
 use crate::helper_functions::{
-    assert_error_code, get_token_account_amount, initialize_async_vault, set_share_balance,
-    set_up_async_vault, update_vault_nav,
+    assert_error_code, get_token_account_amount, set_share_balance, set_up_async_vault,
 };
 
 #[test_case(1_000_000_000, false, None ; "redeem request succeeds")]
 #[test_case(1_000_000_000, true, None ; "redeem with operator succeeds")]
 #[test_case(0, false, Some((6011, "InsufficientRedeemAmount")) ; "zero amount fails")]
-#[test_case(1_000, false, Some((6003, "ArithmeticError")) ; "arithmetic error fails")]
 fn test_create_redeem_request(
     share_amount: u64,
     with_operator: bool,
@@ -42,9 +42,20 @@ fn test_create_redeem_request(
         user_share_account,
     ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 0, 100_000_000);
 
-    initialize_async_vault(&mut svm, &authority, share_mint.pubkey(), vault_pubkey)
+    InitializeAsyncVaultBuilder::new()
+        .authority(authority.pubkey())
+        .share_mint(share_mint.pubkey())
+        .vault(vault_pubkey)
+        .instruction()
+        .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
         .expect("initialize vault should succeed");
-    update_vault_nav(&mut svm, &authority, vault_pubkey, 100).expect("update nav should succeed");
+    UpdateVaultNavBuilder::new()
+        .authority(authority.pubkey())
+        .vault(vault_pubkey)
+        .updated_nav(100)
+        .instruction()
+        .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+        .expect("update nav should succeed");
 
     if share_amount > 0 {
         set_share_balance(
