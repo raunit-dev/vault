@@ -87,6 +87,9 @@ pub enum AsyncVaultError {
     /// 6025 - Request is not in a Pending state.
     #[error("Request is not in a Pending state.")]
     RequestNotPending = 0x1789,
+    /// 6026 - Request is not in a Claimable state.
+    #[error("Request is not in a Claimable state.")]
+    RequestNotClaimable = 0x178A,
 }
 
 impl From<AsyncVaultError> for solana_program_error::ProgramError {

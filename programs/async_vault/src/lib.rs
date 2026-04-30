@@ -65,6 +65,14 @@ pub mod async_vault {
         instructions::update_withdrawal_fee::handler(ctx, args)
     }
 
+    /// User claims their shares or assets from an approved Deposit or Redemption request.
+    /// Request must be Claimable.
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+        instructions::claim::handler(ctx)
+    }
+
+    /* Vault Authority instructions */
+
     /// Stores a pending authority on the vault without transferring control.
     /// The new authority must later call `accept_authority_invitation` to
     /// complete the transfer. Requires current authority signature.
@@ -137,7 +145,7 @@ pub mod async_vault {
         instructions::withdraw_assets::handler(ctx, amount)
     }
 
-    /// It sets an operator for the vault.
+    /// Sets an operator for the Request.
     /// Requires Request owner signature.
     pub fn set_operator(ctx: Context<SetOperator>) -> Result<()> {
         instructions::set_operator::handler(ctx)

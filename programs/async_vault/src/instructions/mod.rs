@@ -1,6 +1,7 @@
 pub mod accept_authority_invitation;
 pub mod approve_request;
 pub mod cancel_request;
+pub mod claim;
 pub mod create_deposit_request;
 pub mod create_redeem_request;
 pub mod create_vault;
@@ -19,6 +20,7 @@ pub mod withdraw_assets;
 pub use accept_authority_invitation::*;
 pub use approve_request::*;
 pub use cancel_request::*;
+pub use claim::*;
 pub use create_deposit_request::*;
 pub use create_redeem_request::*;
 pub use create_vault::*;

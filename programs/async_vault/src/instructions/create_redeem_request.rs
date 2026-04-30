@@ -55,7 +55,7 @@ impl<'info> CreateRedeemRequest<'info> {
     }
 }
 
-pub fn handler<'info>(ctx: Context<CreateRedeemRequest>, args: RequestArgs) -> Result<()> {
+pub fn handler(ctx: Context<CreateRedeemRequest>, args: RequestArgs) -> Result<()> {
     ctx.accounts.vault.assert_unpaused_and_initialized()?;
     require!(
         ctx.accounts.vault.async_outflows,
