@@ -5,6 +5,7 @@ mod constants;
 mod create_deposit_request;
 mod create_redeem_request;
 mod create_vault;
+mod extenstions;
 mod fee_extensions;
 mod initialize_vault;
 mod reject_request;
