@@ -14,8 +14,6 @@ pub struct Vault {
     pub authority: Pubkey,
     /// pubkey that is required to own the TokenAccount fees are sent to
     pub fee_recipient: Pubkey,
-    /// initial price of shares in asset units (scaled by asset mint decimals)
-    pub initial_price: u64,
     /// paused
     pub paused: bool,
     /// once a vault is initialized, no extensions can be added
@@ -26,10 +24,6 @@ pub struct Vault {
     pub nav: u128,
     /// nav version, incremented on each NAV update
     pub nav_version: u64,
-    /// whether deposits are processed asynchronously
-    pub async_inflows: bool,
-    /// whether withdrawals are processed asynchronously
-    pub async_outflows: bool,
     /// count of pending async deposit/withdrawal requests
     pub pending_async_requests: u16,
     /// virtual vault asset balance, accounts for tokens that may

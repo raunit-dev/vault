@@ -30,18 +30,10 @@ fn test_set_operator_succeeds() {
         pending_vault_pubkey,
         _pending_shares_vault_pubkey,
         _fee_recipient_ata,
-    ) = set_up_async_vault(
-        &mut svm,
-        token::ID,
-        None,
-        token::ID,
-        1_000_000_000,
-        100_000_000,
-    );
+    ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 1_000_000_000);
 
     InitializeAsyncVaultBuilder::new()
         .authority(authority.pubkey())
-        .share_mint(share_mint.pubkey())
         .vault(vault_pubkey)
         .instruction()
         .send_transaction(&mut svm, &authority.pubkey(), &[&authority])

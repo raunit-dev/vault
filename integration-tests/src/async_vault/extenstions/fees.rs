@@ -55,14 +55,7 @@ fn setup_with_fees(
         pending_vault_pubkey,
         fee_recipient_ata,
         user_share_account,
-    ) = set_up_async_vault(
-        &mut svm,
-        token::ID,
-        None,
-        token::ID,
-        1_000_000_000,
-        100_000_000,
-    );
+    ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 1_000_000_000);
 
     if let Some(fee) = deposit_fee {
         InitializeDepositFeeBuilder::new()
@@ -90,7 +83,6 @@ fn setup_with_fees(
 
     InitializeAsyncVaultBuilder::new()
         .authority(authority.pubkey())
-        .share_mint(share_mint.pubkey())
         .vault(vault_pubkey)
         .instruction()
         .send_transaction(&mut svm, &authority.pubkey(), &[&authority])

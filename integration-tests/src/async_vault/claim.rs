@@ -3,20 +3,18 @@ use async_vault_client::{
     lite::SendTransaction, sdk::program_id, ApproveRequestBuilder, ClaimBuilder,
     CreateDepositRequestBuilder, CreateRedeemRequestBuilder,
     InitializeVaultBuilder as InitializeAsyncVaultBuilder, RequestArgs,
-    UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder, Vault,
+    UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
 };
-use borsh::BorshSerialize;
 use litesvm::LiteSVM;
-use solana_sdk::{
-    account::ReadableAccount, pubkey::Pubkey, signature::Keypair, signer::Signer,
-    transaction::Transaction,
-};
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
 use test_case::test_case;
 
 use crate::helper_functions::{
     assert_error_code, get_mint_supply, get_token_account_amount, helper_mint_to,
-    set_share_balance, set_up_async_vault,
+    set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
 };
+
+const LITESVM_TX_COST: u64 = 5000;
 
 fn setup(
     svm: &mut LiteSVM,
@@ -48,11 +46,10 @@ fn setup(
         pending_vault_pubkey,
         _fee_recipient_ata,
         user_share_account,
-    ) = set_up_async_vault(svm, token::ID, None, token::ID, 1_000_000_000, 100_000_000);
+    ) = set_up_async_vault(svm, token::ID, None, token::ID, 1_000_000_000);
 
     InitializeAsyncVaultBuilder::new()
         .authority(authority.pubkey())
-        .share_mint(share_mint.pubkey())
         .vault(vault_pubkey)
         .instruction()
         .send_transaction(svm, &authority.pubkey(), &[&authority])
@@ -116,7 +113,7 @@ fn test_claim_deposit_success(
     let request_keypair = Keypair::new();
     let operator_pubkey = use_operator.then_some(operator.pubkey());
 
-    let ix = CreateDepositRequestBuilder::new()
+    CreateDepositRequestBuilder::new()
         .user(user.pubkey())
         .asset_mint(asset_mint.pubkey())
         .share_mint(share_mint.pubkey())
@@ -129,14 +126,8 @@ fn test_claim_deposit_success(
             amount: deposit_amount,
             operator: operator_pubkey,
         })
-        .instruction();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&user.pubkey()),
-        &[&user, &request_keypair],
-        svm.latest_blockhash(),
-    );
-    svm.send_transaction(tx)
+        .instruction()
+        .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair])
         .expect("create deposit request should succeed");
 
     // Approve: assets move pending → reserve, request.amount set to shares
@@ -154,6 +145,8 @@ fn test_claim_deposit_success(
         .expect("approve_request should succeed");
 
     // Snapshot balances after approve (before claim)
+    let request_account_before = svm.get_account(&request_keypair.pubkey()).unwrap();
+    let request_owner_account_before = svm.get_account(&user.pubkey()).unwrap();
     let user_shares_before =
         get_token_account_amount(&svm.get_account(&user_share_account).unwrap());
     let share_supply_before = get_mint_supply(&svm.get_account(&share_mint.pubkey()).unwrap());
@@ -161,6 +154,7 @@ fn test_claim_deposit_success(
     let claimer = if use_operator { &operator } else { &user };
     ClaimBuilder::new()
         .user(claimer.pubkey())
+        .owner(user.pubkey())
         .vault(vault_pubkey)
         .request(request_keypair.pubkey())
         .asset_mint(asset_mint.pubkey())
@@ -173,6 +167,8 @@ fn test_claim_deposit_success(
         .instruction()
         .send_transaction(&mut svm, &claimer.pubkey(), &[claimer])
         .expect("claim_request should succeed");
+
+    let request_owner_account_after = svm.get_account(&user.pubkey()).unwrap();
 
     assert!(
         svm.get_account(&request_keypair.pubkey()).is_none(),
@@ -187,6 +183,16 @@ fn test_claim_deposit_success(
         get_mint_supply(&svm.get_account(&share_mint.pubkey()).unwrap()),
         share_supply_before + expected_deposit_shares,
         "share mint supply should increase by minted shares"
+    );
+    // Account for TX fee when User instead of Operator
+    let expected_lamports = if use_operator {
+        request_owner_account_before.lamports + request_account_before.lamports
+    } else {
+        request_owner_account_before.lamports + request_account_before.lamports - LITESVM_TX_COST
+    };
+    assert_eq!(
+        request_owner_account_after.lamports, expected_lamports,
+        "Rent is sent to request owner"
     );
 }
 
@@ -227,15 +233,7 @@ fn test_claim_redeem_success(
     );
 
     // Set vault.total_asset_balance to match the funded reserve
-    {
-        let mut account = svm.get_account(&vault_pubkey).unwrap();
-        let mut vault = Vault::from_bytes(account.data()).unwrap();
-        vault.total_asset_balance = expected_redeem_assets;
-        let mut buf = Vec::new();
-        vault.serialize(&mut buf).unwrap();
-        account.data = buf;
-        svm.set_account(vault_pubkey, account).unwrap();
-    }
+    set_vault_total_asset_balance(&mut svm, vault_pubkey, expected_redeem_assets);
 
     // Give the user shares to redeem
     set_share_balance(
@@ -248,7 +246,7 @@ fn test_claim_redeem_success(
     let request_keypair = Keypair::new();
     let operator_pubkey = use_operator.then_some(operator.pubkey());
 
-    let ix = CreateRedeemRequestBuilder::new()
+    CreateRedeemRequestBuilder::new()
         .user(user.pubkey())
         .asset_mint(asset_mint.pubkey())
         .share_mint(share_mint.pubkey())
@@ -260,14 +258,8 @@ fn test_claim_redeem_success(
             amount: redeem_amount,
             operator: operator_pubkey,
         })
-        .instruction();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&user.pubkey()),
-        &[&user, &request_keypair],
-        svm.latest_blockhash(),
-    );
-    svm.send_transaction(tx)
+        .instruction()
+        .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair])
         .expect("create redeem request should succeed");
 
     // Approve: assets move reserve → pending_vault, request.amount set to assets
@@ -285,6 +277,8 @@ fn test_claim_redeem_success(
         .expect("approve_request should succeed");
 
     // Snapshot balances after approve (before claim)
+    let request_account_before = svm.get_account(&request_keypair.pubkey()).unwrap();
+    let request_owner_account_before = svm.get_account(&user.pubkey()).unwrap();
     let pending_vault_before =
         get_token_account_amount(&svm.get_account(&pending_vault_pubkey).unwrap());
     let user_assets_before =
@@ -293,6 +287,7 @@ fn test_claim_redeem_success(
     let claimer = if use_operator { &operator } else { &user };
     ClaimBuilder::new()
         .user(claimer.pubkey())
+        .owner(user.pubkey())
         .vault(vault_pubkey)
         .request(request_keypair.pubkey())
         .asset_mint(asset_mint.pubkey())
@@ -305,6 +300,8 @@ fn test_claim_redeem_success(
         .instruction()
         .send_transaction(&mut svm, &claimer.pubkey(), &[claimer])
         .expect("claim_request should succeed");
+
+    let request_owner_account_after = svm.get_account(&user.pubkey()).unwrap();
 
     assert!(
         svm.get_account(&request_keypair.pubkey()).is_none(),
@@ -319,6 +316,16 @@ fn test_claim_redeem_success(
         get_token_account_amount(&svm.get_account(&pending_vault_pubkey).unwrap()),
         pending_vault_before - expected_redeem_assets,
         "pending_vault should be drained by claim"
+    );
+    // Account for TX fee when User instead of Operator
+    let expected_lamports = if use_operator {
+        request_owner_account_before.lamports + request_account_before.lamports
+    } else {
+        request_owner_account_before.lamports + request_account_before.lamports - LITESVM_TX_COST
+    };
+    assert_eq!(
+        request_owner_account_after.lamports, expected_lamports,
+        "Rent is sent to request owner"
     );
 }
 
@@ -411,6 +418,7 @@ fn test_claim_fails(
 
     let result = ClaimBuilder::new()
         .user(claimer.pubkey())
+        .owner(user.pubkey())
         .vault(vault_pubkey)
         .request(request_keypair.pubkey())
         .asset_mint(asset_mint.pubkey())

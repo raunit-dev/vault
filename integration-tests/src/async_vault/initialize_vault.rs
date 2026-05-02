@@ -31,7 +31,7 @@ fn test_initialize_vault(use_valid_authority: bool, pre_initialize: bool) {
         _pending_vault_pubkey,
         _fee_recipient_ata,
         _user_share_account,
-    ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 0, 100_000_000);
+    ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 0);
 
     let vault_account = svm.get_account(&vault_pubkey).unwrap();
     let vault_before = Vault::from_bytes(vault_account.data()).unwrap();
@@ -40,7 +40,6 @@ fn test_initialize_vault(use_valid_authority: bool, pre_initialize: bool) {
     if pre_initialize {
         InitializeAsyncVaultBuilder::new()
             .authority(authority.pubkey())
-            .share_mint(share_mint.pubkey())
             .vault(vault_pubkey)
             .instruction()
             .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
@@ -59,7 +58,6 @@ fn test_initialize_vault(use_valid_authority: bool, pre_initialize: bool) {
 
     let result = InitializeAsyncVaultBuilder::new()
         .authority(effective_authority.pubkey())
-        .share_mint(share_mint.pubkey())
         .vault(vault_pubkey)
         .instruction()
         .send_transaction(
@@ -84,9 +82,6 @@ fn test_initialize_vault(use_valid_authority: bool, pre_initialize: bool) {
             vault_before.vault_token_account,
             vault_after.vault_token_account
         );
-        assert_eq!(vault_before.initial_price, vault_after.initial_price);
-        assert_eq!(vault_before.async_inflows, vault_after.async_inflows);
-        assert_eq!(vault_before.async_outflows, vault_after.async_outflows);
         assert_eq!(vault_before.nav, vault_after.nav);
         assert_eq!(vault_before.nav_version, vault_after.nav_version);
         assert_eq!(vault_before.pending_vault, vault_after.pending_vault);

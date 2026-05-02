@@ -14,9 +14,6 @@ use crate::{
 pub struct AsyncVaultArgs {
     authority: Pubkey,
     fee_recipient: Pubkey,
-    initial_price: u64,
-    async_inflows: bool,
-    async_outflows: bool,
 }
 
 #[derive(Accounts)]
@@ -33,6 +30,15 @@ pub struct CreateVault<'info> {
         constraint = share_mint.key() != asset_mint.key() @ AsyncVaultError::MintsShouldBeDifferent,
     )]
     pub share_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        init,
+        space = 8 + Vault::INIT_SPACE,
+        payer = payer,
+        seeds = [VAULT_CONFIG_SEED, share_mint.key().as_ref()],
+        bump
+    )]
+    pub vault: Account<'info, Vault>,
 
     #[account(
         init,
@@ -55,15 +61,6 @@ pub struct CreateVault<'info> {
         bump,
     )]
     pub pending_vault: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        init,
-        space = 8 + Vault::INIT_SPACE,
-        payer = payer,
-        seeds = [VAULT_CONFIG_SEED, share_mint.key().as_ref()],
-        bump
-    )]
-    pub vault: Account<'info, Vault>,
 
     pub asset_token_program: Interface<'info, TokenInterface>,
     pub share_token_program: Interface<'info, TokenInterface>,
@@ -96,10 +93,6 @@ impl<'info> CreateVault<'info> {
 /// Freeze authority is not transferred since is up to the implementator to manage it.
 pub fn handler(ctx: Context<CreateVault>, args: AsyncVaultArgs) -> Result<()> {
     require!(
-        args.initial_price != 0,
-        AsyncVaultError::InvalidInitialPrice
-    );
-    require!(
         ctx.accounts.share_mint.supply == 0,
         AsyncVaultError::ShareMintSupplyShouldBeZero
     );
@@ -114,14 +107,11 @@ pub fn handler(ctx: Context<CreateVault>, args: AsyncVaultArgs) -> Result<()> {
         vault_token_account: ctx.accounts.reserve.key(),
         authority: args.authority,
         fee_recipient: args.fee_recipient,
-        initial_price: args.initial_price,
         paused: false,
         initialized: false,
         pending_vault: ctx.accounts.pending_vault.key(),
         nav: 0,
         nav_version: 0,
-        async_inflows: args.async_inflows,
-        async_outflows: args.async_outflows,
         pending_async_requests: 0,
         total_asset_balance: 0,
         pending_authority: None,
