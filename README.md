@@ -4,9 +4,11 @@
 
 We aim to create a standard factory program that handles many of the same use cases as ERC 4626 and 7540. This is an important primitive that would make it easier and safer for others to develop on top of. By handling the subscription/redemption process within a standard implementation, we can promote more lindiness of critical Solana infrastructure, while still allowing innovation on top.
 
+## [Glossary](./GLOSSARY.md)
+
 ## **Background**
 
-RWA issuers build custom smart contracts and infrastructure to support their tokenization efforts on Solana. Every product is slightly different, but the high level requirements are all very similar. Tokens need KYC checks, products should have role based access control, and investors should be able to subscribe and redeem from the RWA. This led us to discussing what it would take to build core primitives for these components to make it easier and more secure to deploy on Solana. 
+RWA issuers build custom smart contracts and infrastructure to support their tokenization efforts on Solana. Every product is slightly different, but the high level requirements are all very similar. Tokens need KYC checks, products should have role based access control, and investors should be able to subscribe and redeem from the RWA. This led us to discuss what it would take to build core primitives for these components to make it easier and more secure to deploy on Solana. 
 
 Vaults are just one piece of the puzzle. [sRFC 37](https://forum.solana.com/t/srfc-37-efficient-block-allow-list-token-standard/4036), the Token Access Control List (ACL), standardizes a pattern for handling KYC of a Token without compromising composability (i.e. an improvement to Transfer Hooks). These initiatives together enable KYC’d tokens with subscription/redemption capabilities without the need to deploy custom smart contracts.
 
@@ -22,23 +24,15 @@ As a corollary, the program will not initialize token accounts nor enforce ATAs.
 
 ## **Programs:**
 
-# **Async Vault**
+### **Async Vault**
 
-The primary vault implementation supporting asynchronous deposit and redemption flows, where requests are queued and settled by a vault authority.
+The primary vault implementation supporting asynchronous deposit and redemption flows, where requests are queued and settled by a vault authority. This program is intended to be used across a wide variety of applications with the most influence from Real World Asset (RWA) issuers, teams implmenting offchain strategies, and others where regulatory compliance is required.
 
 - [Sequence Diagrams](programs/async_vault/SEQUENCES.md)
 
-# **Vault (Atomic Vault)**
+### **Vault (Atomic Vault)**
 
-This is an MVP, it's not production ready since we have decided to focus on the Async Vault implementation
-
-# **Hook Program**
-
-This is an example of how a hook program should look like. 
-
-# **Dummy Protocol**
-
-This is a MVP to test e2e the Deposit and withdraw hook extensions.
+This is a MVP, it's not production ready since we have decided to focus on the Async Vault implementation.
 
 ## Feedback
 
