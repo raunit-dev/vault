@@ -5,22 +5,22 @@
 //! <https://github.com/codama-idl/codama>
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_pubkey::Pubkey;
 
-pub const UPDATE_VAULT_DISCRIMINATOR: [u8; 8] = [67, 229, 185, 188, 226, 11, 210, 60];
+pub const UPDATE_PAUSABLE_REDEMPTIONS_DISCRIMINATOR: [u8; 8] = [42, 12, 92, 189, 83, 1, 231, 159];
 
 /// Accounts.
 #[derive(Debug)]
-pub struct UpdateVault {
+pub struct UpdatePausableRedemptions {
     pub authority: solana_pubkey::Pubkey,
-
-    pub share_mint: solana_pubkey::Pubkey,
 
     pub vault: solana_pubkey::Pubkey,
 }
 
-impl UpdateVault {
-    pub fn instruction(&self, args: UpdateVaultInstructionArgs) -> solana_instruction::Instruction {
+impl UpdatePausableRedemptions {
+    pub fn instruction(
+        &self,
+        args: UpdatePausableRedemptionsInstructionArgs,
+    ) -> solana_instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
 
@@ -28,21 +28,19 @@ impl UpdateVault {
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
-        args: UpdateVaultInstructionArgs,
+        args: UpdatePausableRedemptionsInstructionArgs,
         remaining_accounts: &[solana_instruction::AccountMeta],
     ) -> solana_instruction::Instruction {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.authority,
             true,
         ));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            self.share_mint,
-            false,
-        ));
         accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = UpdateVaultInstructionData::new().try_to_vec().unwrap();
+        let mut data = UpdatePausableRedemptionsInstructionData::new()
+            .try_to_vec()
+            .unwrap();
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
@@ -56,14 +54,14 @@ impl UpdateVault {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpdateVaultInstructionData {
+pub struct UpdatePausableRedemptionsInstructionData {
     discriminator: [u8; 8],
 }
 
-impl UpdateVaultInstructionData {
+impl UpdatePausableRedemptionsInstructionData {
     pub fn new() -> Self {
         Self {
-            discriminator: [67, 229, 185, 188, 226, 11, 210, 60],
+            discriminator: [42, 12, 92, 189, 83, 1, 231, 159],
         }
     }
 
@@ -72,7 +70,7 @@ impl UpdateVaultInstructionData {
     }
 }
 
-impl Default for UpdateVaultInstructionData {
+impl Default for UpdatePausableRedemptionsInstructionData {
     fn default() -> Self {
         Self::new()
     }
@@ -80,35 +78,31 @@ impl Default for UpdateVaultInstructionData {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpdateVaultInstructionArgs {
-    pub paused: Option<bool>,
-    pub fee_recipient: Option<Pubkey>,
+pub struct UpdatePausableRedemptionsInstructionArgs {
+    pub paused: bool,
 }
 
-impl UpdateVaultInstructionArgs {
+impl UpdatePausableRedemptionsInstructionArgs {
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
         borsh::to_vec(self)
     }
 }
 
-/// Instruction builder for `UpdateVault`.
+/// Instruction builder for `UpdatePausableRedemptions`.
 ///
 /// ### Accounts:
 ///
 ///   0. `[signer]` authority
-///   1. `[]` share_mint
-///   2. `[writable]` vault
+///   1. `[writable]` vault
 #[derive(Clone, Debug, Default)]
-pub struct UpdateVaultBuilder {
+pub struct UpdatePausableRedemptionsBuilder {
     authority: Option<solana_pubkey::Pubkey>,
-    share_mint: Option<solana_pubkey::Pubkey>,
     vault: Option<solana_pubkey::Pubkey>,
     paused: Option<bool>,
-    fee_recipient: Option<Pubkey>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
-impl UpdateVaultBuilder {
+impl UpdatePausableRedemptionsBuilder {
     pub fn new() -> Self {
         Self::default()
     }
@@ -120,28 +114,14 @@ impl UpdateVaultBuilder {
     }
 
     #[inline(always)]
-    pub fn share_mint(&mut self, share_mint: solana_pubkey::Pubkey) -> &mut Self {
-        self.share_mint = Some(share_mint);
-        self
-    }
-
-    #[inline(always)]
     pub fn vault(&mut self, vault: solana_pubkey::Pubkey) -> &mut Self {
         self.vault = Some(vault);
         self
     }
 
-    /// `[optional argument]`
     #[inline(always)]
     pub fn paused(&mut self, paused: bool) -> &mut Self {
         self.paused = Some(paused);
-        self
-    }
-
-    /// `[optional argument]`
-    #[inline(always)]
-    pub fn fee_recipient(&mut self, fee_recipient: Pubkey) -> &mut Self {
-        self.fee_recipient = Some(fee_recipient);
         self
     }
 
@@ -164,53 +144,46 @@ impl UpdateVaultBuilder {
 
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_instruction::Instruction {
-        let accounts = UpdateVault {
+        let accounts = UpdatePausableRedemptions {
             authority: self.authority.expect("authority is not set"),
-            share_mint: self.share_mint.expect("share_mint is not set"),
             vault: self.vault.expect("vault is not set"),
         };
-        let args = UpdateVaultInstructionArgs {
-            paused: self.paused.clone(),
-            fee_recipient: self.fee_recipient.clone(),
+        let args = UpdatePausableRedemptionsInstructionArgs {
+            paused: self.paused.clone().expect("paused is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
     }
 }
 
-/// `update_vault` CPI accounts.
-pub struct UpdateVaultCpiAccounts<'a, 'b> {
+/// `update_pausable_redemptions` CPI accounts.
+pub struct UpdatePausableRedemptionsCpiAccounts<'a, 'b> {
     pub authority: &'b solana_account_info::AccountInfo<'a>,
-
-    pub share_mint: &'b solana_account_info::AccountInfo<'a>,
 
     pub vault: &'b solana_account_info::AccountInfo<'a>,
 }
 
-/// `update_vault` CPI instruction.
-pub struct UpdateVaultCpi<'a, 'b> {
+/// `update_pausable_redemptions` CPI instruction.
+pub struct UpdatePausableRedemptionsCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_account_info::AccountInfo<'a>,
 
     pub authority: &'b solana_account_info::AccountInfo<'a>,
 
-    pub share_mint: &'b solana_account_info::AccountInfo<'a>,
-
     pub vault: &'b solana_account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
-    pub __args: UpdateVaultInstructionArgs,
+    pub __args: UpdatePausableRedemptionsInstructionArgs,
 }
 
-impl<'a, 'b> UpdateVaultCpi<'a, 'b> {
+impl<'a, 'b> UpdatePausableRedemptionsCpi<'a, 'b> {
     pub fn new(
         program: &'b solana_account_info::AccountInfo<'a>,
-        accounts: UpdateVaultCpiAccounts<'a, 'b>,
-        args: UpdateVaultInstructionArgs,
+        accounts: UpdatePausableRedemptionsCpiAccounts<'a, 'b>,
+        args: UpdatePausableRedemptionsInstructionArgs,
     ) -> Self {
         Self {
             __program: program,
             authority: accounts.authority,
-            share_mint: accounts.share_mint,
             vault: accounts.vault,
             __args: args,
         }
@@ -242,14 +215,10 @@ impl<'a, 'b> UpdateVaultCpi<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
         remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> solana_program_error::ProgramResult {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.authority.key,
             true,
-        ));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            *self.share_mint.key,
-            false,
         ));
         accounts.push(solana_instruction::AccountMeta::new(*self.vault.key, false));
         remaining_accounts.iter().for_each(|remaining_account| {
@@ -259,7 +228,9 @@ impl<'a, 'b> UpdateVaultCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = UpdateVaultInstructionData::new().try_to_vec().unwrap();
+        let mut data = UpdatePausableRedemptionsInstructionData::new()
+            .try_to_vec()
+            .unwrap();
         let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
@@ -268,10 +239,9 @@ impl<'a, 'b> UpdateVaultCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(4 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(3 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.authority.clone());
-        account_infos.push(self.share_mint.clone());
         account_infos.push(self.vault.clone());
         remaining_accounts
             .iter()
@@ -285,27 +255,24 @@ impl<'a, 'b> UpdateVaultCpi<'a, 'b> {
     }
 }
 
-/// Instruction builder for `UpdateVault` via CPI.
+/// Instruction builder for `UpdatePausableRedemptions` via CPI.
 ///
 /// ### Accounts:
 ///
 ///   0. `[signer]` authority
-///   1. `[]` share_mint
-///   2. `[writable]` vault
+///   1. `[writable]` vault
 #[derive(Clone, Debug)]
-pub struct UpdateVaultCpiBuilder<'a, 'b> {
-    instruction: Box<UpdateVaultCpiBuilderInstruction<'a, 'b>>,
+pub struct UpdatePausableRedemptionsCpiBuilder<'a, 'b> {
+    instruction: Box<UpdatePausableRedemptionsCpiBuilderInstruction<'a, 'b>>,
 }
 
-impl<'a, 'b> UpdateVaultCpiBuilder<'a, 'b> {
+impl<'a, 'b> UpdatePausableRedemptionsCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_account_info::AccountInfo<'a>) -> Self {
-        let instruction = Box::new(UpdateVaultCpiBuilderInstruction {
+        let instruction = Box::new(UpdatePausableRedemptionsCpiBuilderInstruction {
             __program: program,
             authority: None,
-            share_mint: None,
             vault: None,
             paused: None,
-            fee_recipient: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -318,31 +285,14 @@ impl<'a, 'b> UpdateVaultCpiBuilder<'a, 'b> {
     }
 
     #[inline(always)]
-    pub fn share_mint(
-        &mut self,
-        share_mint: &'b solana_account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.share_mint = Some(share_mint);
-        self
-    }
-
-    #[inline(always)]
     pub fn vault(&mut self, vault: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.vault = Some(vault);
         self
     }
 
-    /// `[optional argument]`
     #[inline(always)]
     pub fn paused(&mut self, paused: bool) -> &mut Self {
         self.instruction.paused = Some(paused);
-        self
-    }
-
-    /// `[optional argument]`
-    #[inline(always)]
-    pub fn fee_recipient(&mut self, fee_recipient: Pubkey) -> &mut Self {
-        self.instruction.fee_recipient = Some(fee_recipient);
         self
     }
 
@@ -384,16 +334,13 @@ impl<'a, 'b> UpdateVaultCpiBuilder<'a, 'b> {
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
-        let args = UpdateVaultInstructionArgs {
-            paused: self.instruction.paused.clone(),
-            fee_recipient: self.instruction.fee_recipient.clone(),
+        let args = UpdatePausableRedemptionsInstructionArgs {
+            paused: self.instruction.paused.clone().expect("paused is not set"),
         };
-        let instruction = UpdateVaultCpi {
+        let instruction = UpdatePausableRedemptionsCpi {
             __program: self.instruction.__program,
 
             authority: self.instruction.authority.expect("authority is not set"),
-
-            share_mint: self.instruction.share_mint.expect("share_mint is not set"),
 
             vault: self.instruction.vault.expect("vault is not set"),
             __args: args,
@@ -406,13 +353,11 @@ impl<'a, 'b> UpdateVaultCpiBuilder<'a, 'b> {
 }
 
 #[derive(Clone, Debug)]
-struct UpdateVaultCpiBuilderInstruction<'a, 'b> {
+struct UpdatePausableRedemptionsCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_account_info::AccountInfo<'a>,
     authority: Option<&'b solana_account_info::AccountInfo<'a>>,
-    share_mint: Option<&'b solana_account_info::AccountInfo<'a>>,
     vault: Option<&'b solana_account_info::AccountInfo<'a>>,
     paused: Option<bool>,
-    fee_recipient: Option<Pubkey>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,
 }

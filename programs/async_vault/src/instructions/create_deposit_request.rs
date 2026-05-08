@@ -1,4 +1,6 @@
-use crate::{error::AsyncVaultError, utils::validate_asset_mint_extensions_from_acct_info};
+use crate::{
+    error::AsyncVaultError, extensions, utils::validate_asset_mint_extensions_from_acct_info,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use vault_common::VaultProgramError;
@@ -71,6 +73,16 @@ impl<'info> CreateDepositRequest<'info> {
 }
 pub fn handler(ctx: Context<CreateDepositRequest>, args: RequestArgs) -> Result<()> {
     ctx.accounts.vault.assert_unpaused_and_initialized()?;
+
+    // Extension: PausableSubscription handlings
+    {
+        let vault_info = ctx.accounts.vault.to_account_info();
+        let data = vault_info
+            .data
+            .try_borrow()
+            .map_err(|_| ProgramError::AccountBorrowFailed)?;
+        extensions::pausable_subscriptions::check_subscriptions_paused(&data)?;
+    }
 
     validate_asset_mint_extensions_from_acct_info(&ctx.accounts.asset_mint.to_account_info())?;
 

@@ -1,19 +1,20 @@
 use anchor_lang::prelude::*;
-use vault_common::FeeType;
 
 use crate::{
     error::AsyncVaultError,
-    extensions::{fee::DepositFee, init_vault_extension, VaultExtension},
+    extensions::{
+        init_vault_extension, pausable_subscriptions::PausableSubscription, VaultExtension,
+    },
     state::Vault,
 };
 
 #[derive(AnchorDeserialize, AnchorSerialize)]
-pub struct InitDepositFeeArgs {
-    pub deposit_fee: FeeType,
+pub struct InitPausableSubscriptionsArgs {
+    pub paused: bool,
 }
 
 #[derive(Accounts)]
-pub struct InitDepositFee<'info> {
+pub struct InitPausableSubscriptions<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -21,7 +22,7 @@ pub struct InitDepositFee<'info> {
 
     #[account(
         mut,
-        realloc = vault.to_account_info().data_len() + DepositFee::TLV_SIZE,
+        realloc = vault.to_account_info().data_len() + PausableSubscription::TLV_SIZE,
         realloc::payer = payer,
         realloc::zero = false,
         constraint = authority.key() == vault.authority @ AsyncVaultError::UnauthorizedSigner,
@@ -31,11 +32,15 @@ pub struct InitDepositFee<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<InitDepositFee>, args: InitDepositFeeArgs) -> Result<()> {
-    args.deposit_fee.validate()?;
+pub fn handler(
+    ctx: Context<InitPausableSubscriptions>,
+    args: InitPausableSubscriptionsArgs,
+) -> Result<()> {
     init_vault_extension(
         &ctx.accounts.vault.to_account_info(),
         &ctx.accounts.vault,
-        &DepositFee(args.deposit_fee),
+        &PausableSubscription {
+            paused: args.paused,
+        },
     )
 }
