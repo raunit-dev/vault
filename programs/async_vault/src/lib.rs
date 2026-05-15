@@ -163,6 +163,31 @@ pub mod async_vault {
         )
     }
 
+    /// Adds a SubscriptionQueue TLV extension to the vault, enabling FIFO ordering
+    /// for deposit requests. Must be called before vault initialization. Requires authority
+    /// signature.
+    pub fn initialize_subscription_queue(ctx: Context<InitializeSubscriptionQueue>) -> Result<()> {
+        extensions::subscription_queue::instructions::initialize_subscription_queue::handler(ctx)
+    }
+
+    /// Cancels a pending queued deposit request. Assets are refunded immediately. The request
+    /// account remains open as a tombstone so the subscription queue can advance past it via
+    /// `skip_canceled_subscription_request`. Only valid for vaults with SubscriptionQueue active.
+    pub fn cancel_queued_deposit_request(ctx: Context<CancelQueuedDepositRequest>) -> Result<()> {
+        extensions::subscription_queue::instructions::cancel_queued_deposit_request::handler(ctx)
+    }
+
+    /// Permissionless instruction that advances the subscription queue past a canceled deposit
+    /// request, closes the request account, and returns rent to the original owner. Must be
+    /// called in ascending request ID order for consecutive tombstones.
+    pub fn skip_canceled_subscription_request(
+        ctx: Context<SkipCanceledSubscriptionRequest>,
+    ) -> Result<()> {
+        extensions::subscription_queue::instructions::skip_canceled_subscription_request::handler(
+            ctx,
+        )
+    }
+
     /* USER INSTRUCTIONS */
 
     /// Creates a deposit request with state pending (Pending vault authority acceptance)

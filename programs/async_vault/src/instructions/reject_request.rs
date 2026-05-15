@@ -6,6 +6,7 @@ use vault_common::VaultProgramError;
 
 use crate::{
     error::AsyncVaultError,
+    extensions::subscription_queue::processor::check_and_advance_subscription_queue,
     state::{Request, RequestState, RequestType, Vault, VAULT_CONFIG_SEED},
 };
 
@@ -133,6 +134,14 @@ pub fn handler(ctx: Context<RejectRequest>) -> Result<()> {
             .eq(&RequestState::Pending),
         AsyncVaultError::RequestInvalidState
     );
+
+    // Extension: SubscriptionQueue — enforce FIFO ordering for deposit requests.
+    if matches!(ctx.accounts.request.request_type, RequestType::Deposit) {
+        check_and_advance_subscription_queue(
+            &ctx.accounts.vault.to_account_info(),
+            &ctx.accounts.request.to_account_info(),
+        )?;
+    }
 
     match ctx.accounts.request.request_type {
         RequestType::Deposit => {

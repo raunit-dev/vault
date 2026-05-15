@@ -60,4 +60,10 @@ pub enum AsyncVaultError {
     SubscriptionsPaused,
     #[msg("Redemptions are paused")]
     RedemptionsPaused,
+    #[msg("Deposit request is not next in the subscription queue")]
+    SubscriptionQueueOutOfOrder,
+    #[msg("Request is not in a Canceled state.")]
+    RequestIsNotCanceled,
+    #[msg("Queued deposit requests must be canceled via cancel_queued_deposit_request.")]
+    MustUseCancelQueuedDepositRequest,
 }

@@ -16,6 +16,7 @@ pub enum ExtensionType {
     WithdrawalFee = 2,
     PausableSubscriptions = 3,
     PausableRedemptions = 4,
+    SubscriptionQueue = 5,
 }
 
 impl ExtensionType {
@@ -25,6 +26,7 @@ impl ExtensionType {
             2 => Some(Self::WithdrawalFee),
             3 => Some(Self::PausableSubscriptions),
             4 => Some(Self::PausableRedemptions),
+            5 => Some(Self::SubscriptionQueue),
             _ => None,
         }
     }
@@ -33,6 +35,7 @@ impl ExtensionType {
         match self {
             Self::DepositFee | Self::WithdrawalFee => 9,
             Self::PausableSubscriptions | Self::PausableRedemptions => 1,
+            Self::SubscriptionQueue => 16,
         }
     }
 
@@ -44,10 +47,10 @@ impl ExtensionType {
 /// Implemented by every extension data struct. Associates the struct with its
 /// [`ExtensionType`] discriminant and the total TLV byte size it occupies on-chain,
 /// enabling the generic init/update/read helpers to operate on any extension uniformly.
-pub trait VaultExtension: AnchorSerialize + AnchorDeserialize + Sized {
+pub trait VaultExtension: bytemuck::Pod + bytemuck::Zeroable {
     /// The TLV discriminant that identifies this extension in vault account data.
     const EXTENSION_TYPE: ExtensionType;
-    /// Borsh-serialized byte count of this extension's data payload.
+    /// Byte count of this extension's data payload.
     const DATA_SIZE: usize = Self::EXTENSION_TYPE.data_len();
     /// Total bytes consumed in the TLV region: `TLV_HEADER_SIZE + DATA_SIZE`.
     const TLV_SIZE: usize = TLV_HEADER_SIZE + Self::DATA_SIZE;
@@ -69,8 +72,7 @@ pub struct BasicExtensionAccounts<'info> {
 
 /// Writes a new TLV extension entry to the vault's extension region.
 ///
-/// Errors if the vault is already initialized, the extension type is already present,
-/// or serialization fails.
+/// Errors if the vault is already initialized or the extension type is already present.
 pub fn init_vault_extension<E: VaultExtension>(
     vault_info: &AccountInfo,
     vault: &Vault,
@@ -87,15 +89,17 @@ pub fn init_vault_extension<E: VaultExtension>(
         AsyncVaultError::ExtensionAlreadyInitialized
     );
     let write_offset = tlv_used_len(tlv_data);
-    let serialized = value
-        .try_to_vec()
-        .map_err(|_| AsyncVaultError::InvalidExtensionData)?;
-    write_extension(tlv_data, write_offset, E::EXTENSION_TYPE, &serialized)
+    write_extension(
+        tlv_data,
+        write_offset,
+        E::EXTENSION_TYPE,
+        bytemuck::bytes_of(value),
+    )
 }
 
 /// Overwrites an existing TLV extension entry in the vault's extension region.
 ///
-/// Errors if the extension type is not present or serialization fails.
+/// Errors if the extension type is not present.
 pub fn update_vault_extension<E: VaultExtension>(
     vault_info: &AccountInfo,
     value: &E,
@@ -105,13 +109,10 @@ pub fn update_vault_extension<E: VaultExtension>(
         .try_borrow_mut()
         .map_err(|_| ProgramError::AccountBorrowFailed)?;
     let tlv_data = &mut data[TLV_START..];
-    let serialized = value
-        .try_to_vec()
-        .map_err(|_| AsyncVaultError::InvalidExtensionData)?;
-    update_extension(tlv_data, E::EXTENSION_TYPE, &serialized)
+    update_extension(tlv_data, E::EXTENSION_TYPE, bytemuck::bytes_of(value))
 }
 
-/// Deserializes an extension from raw vault account data.
+/// Reads an extension from raw vault account data.
 ///
 /// Returns `Ok(None)` if the account has no TLV region or the extension type is absent.
 pub fn read_vault_extension<E: VaultExtension>(account_data: &[u8]) -> Result<Option<E>> {
@@ -121,10 +122,8 @@ pub fn read_vault_extension<E: VaultExtension>(account_data: &[u8]) -> Result<Op
     let tlv_data = &account_data[TLV_START..];
     get_extension_bytes(tlv_data, E::EXTENSION_TYPE)
         .map(|bytes| {
-            // Use deserialize (not try_from_slice) so zero-padding appended by write_extension
-            // for variable-size types like FeeType doesn't cause a trailing-bytes error.
-            E::deserialize(&mut &bytes[..])
-                .map_err(|_| AsyncVaultError::InvalidExtensionData.into())
+            bytemuck::try_pod_read_unaligned::<E>(bytes)
+                .map_err(|_| crate::error::AsyncVaultError::InvalidExtensionData.into())
         })
         .transpose()
 }
