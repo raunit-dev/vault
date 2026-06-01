@@ -413,3 +413,15 @@ pub fn set_vault_total_asset_balance(svm: &mut LiteSVM, vault: Pubkey, amount: u
     account.data = buf;
     svm.set_account(vault, account).unwrap();
 }
+
+pub fn set_vault_pending_async_requests(svm: &mut LiteSVM, vault: Pubkey, count: u16) {
+    let mut account = svm.get_account(&vault).unwrap();
+    let mut vault_state = AsyncVault::from_bytes(account.data()).unwrap();
+    vault_state.pending_async_requests = count;
+    let mut buf = Vec::new();
+    vault_state.serialize(&mut buf).unwrap();
+    let tlv_bytes = account.data()[buf.len()..].to_vec();
+    buf.extend_from_slice(&tlv_bytes);
+    account.data = buf;
+    svm.set_account(vault, account).unwrap();
+}

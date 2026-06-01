@@ -13,7 +13,7 @@ use test_case::test_case;
 use crate::{
     async_helper_functions::{
         assert_error_code, create_ata, get_token_account_amount, set_share_balance,
-        set_up_async_vault,
+        set_up_async_vault, set_vault_pending_async_requests,
     },
     async_vault::constants::{
         ARITHMETIC_ERROR, MISSING_REQUIRED_ACCOUNT, PAUSED_VAULT, REQUEST_IS_NOT_PENDING,
@@ -38,18 +38,6 @@ fn set_request_state(svm: &mut LiteSVM, request_pubkey: Pubkey, state: RequestSt
     buf.extend_from_slice(&tlv_bytes);
     account.data = buf;
     svm.set_account(request_pubkey, account).unwrap();
-}
-
-fn set_vault_pending_async_requests(svm: &mut LiteSVM, vault_pubkey: Pubkey, count: u16) {
-    let mut account = svm.get_account(&vault_pubkey).unwrap();
-    let mut vault = Vault::from_bytes(account.data()).unwrap();
-    vault.pending_async_requests = count;
-    let mut buf = Vec::new();
-    vault.serialize(&mut buf).unwrap();
-    let tlv_bytes = account.data()[buf.len()..].to_vec();
-    buf.extend_from_slice(&tlv_bytes);
-    account.data = buf;
-    svm.set_account(vault_pubkey, account).unwrap();
 }
 
 #[test_case(1_000_000 ; "cancel deposit request refunds user")]

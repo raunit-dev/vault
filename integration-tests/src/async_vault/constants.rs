@@ -1,7 +1,11 @@
 pub(crate) const UNAUTHORIZED_SIGNER: u32 = 6001;
+pub(crate) const UNINITIALIZED_VAULT: u32 = 6002;
 pub(crate) const PAUSED_VAULT: u32 = 6003;
 pub(crate) const ARITHMETIC_ERROR: u32 = 6009;
 pub(crate) const REQUEST_INVALID_STATE: u32 = 6017;
 pub(crate) const REQUEST_IS_NOT_PENDING: u32 = 6018;
 pub(crate) const MISSING_REQUIRED_ACCOUNT: u32 = 6020;
+pub(crate) const INVALID_ASSET_MINT_EXTENSIONS: u32 = 6021;
+pub(crate) const INSUFFICIENT_REDEEM_AMOUNT: u32 = 6037;
 pub(crate) const APPROVAL_REQUEST_MISMATCH: u32 = 6038;
+pub(crate) const INSUFFICIENT_DEPOSIT_AMOUNT: u32 = 6039;

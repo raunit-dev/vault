@@ -4,7 +4,7 @@ use anchor_spl::{
 use async_vault_client::{
     lite::SendTransaction, sdk::program_id, CreateDepositRequestBuilder,
     InitializeVaultBuilder as InitializeAsyncVaultBuilder, Request, RequestArgs, RequestState,
-    RequestType, UpdateVaultNavBuilder,
+    RequestType, UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
 };
 use litesvm::LiteSVM;
 use solana_sdk::{
@@ -13,9 +13,23 @@ use solana_sdk::{
 };
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    assert_error_code, get_token_account_amount, set_up_async_vault,
+use crate::{
+    async_helper_functions::{
+        assert_error_code, get_token_account_amount, set_up_async_vault,
+        set_vault_pending_async_requests,
+    },
+    async_vault::constants::{
+        ARITHMETIC_ERROR, INSUFFICIENT_DEPOSIT_AMOUNT, INVALID_ASSET_MINT_EXTENSIONS, PAUSED_VAULT,
+        UNINITIALIZED_VAULT,
+    },
 };
+
+#[derive(Clone, Copy)]
+enum CreateDepositRequestFailure {
+    UninitializedVault,
+    PausedVault,
+    PendingRequestsOverflow,
+}
 
 #[test_case(1_000_000, false ; "deposit request succeeds")]
 #[test_case(1_000_000, true ; "deposit with operator succeeds")]
@@ -160,8 +174,95 @@ fn test_create_deposit_request(deposit_amount: u64, with_operator: bool) {
     );
 }
 
-#[test_case(Some(1), 1_000_000, 6021 ; "deposit_request_with_nonzero_transfer_fee_fails")]
-#[test_case(None, 0, 6039 ; "zero_amount_deposit_fails")]
+#[test_case(CreateDepositRequestFailure::UninitializedVault, UNINITIALIZED_VAULT, "UninitializedVault" ; "uninitialized vault")]
+#[test_case(CreateDepositRequestFailure::PausedVault, PAUSED_VAULT, "PausedVault" ; "paused vault")]
+#[test_case(CreateDepositRequestFailure::PendingRequestsOverflow, ARITHMETIC_ERROR, "ArithmeticError" ; "pending requests overflow")]
+fn test_create_deposit_request_negative(
+    failure: CreateDepositRequestFailure,
+    expected_error_code: u32,
+    expected_error_name: &str,
+) {
+    let mut svm = LiteSVM::new();
+    let program_bytes = include_bytes!("../../../target/deploy/async_vault.so");
+    svm.add_program(program_id(), program_bytes).unwrap();
+
+    let user_amount = 1_000_000_000;
+    let (
+        authority,
+        _payer,
+        _mint_authority,
+        asset_mint,
+        share_mint,
+        user,
+        _operator,
+        _fee_recipient,
+        _reserve_pubkey,
+        vault_pubkey,
+        pending_vault_pubkey,
+        _fee_recipient_ata,
+        _user_share_account,
+    ) = set_up_async_vault(&mut svm, token::ID, Some(0), token::ID, user_amount);
+
+    if !matches!(failure, CreateDepositRequestFailure::UninitializedVault) {
+        InitializeAsyncVaultBuilder::new()
+            .share_mint(share_mint.pubkey())
+            .authority(authority.pubkey())
+            .vault(vault_pubkey)
+            .instruction()
+            .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+            .expect("initialize vault should succeed");
+    }
+
+    if matches!(failure, CreateDepositRequestFailure::PausedVault) {
+        UpdateVaultAsyncBuilder::new()
+            .authority(authority.pubkey())
+            .share_mint(share_mint.pubkey())
+            .paused(true)
+            .vault(vault_pubkey)
+            .instruction()
+            .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+            .expect("pause vault should succeed");
+    }
+
+    if matches!(
+        failure,
+        CreateDepositRequestFailure::PendingRequestsOverflow
+    ) {
+        set_vault_pending_async_requests(&mut svm, vault_pubkey, u16::MAX);
+    }
+
+    let user_token_account = get_associated_token_address_with_program_id(
+        &user.pubkey(),
+        &asset_mint.pubkey(),
+        &token::ID,
+    );
+    let request_keypair = Keypair::new();
+
+    let result = CreateDepositRequestBuilder::new()
+        .user(user.pubkey())
+        .asset_mint(asset_mint.pubkey())
+        .share_mint(share_mint.pubkey())
+        .request(request_keypair.pubkey())
+        .vault(vault_pubkey)
+        .user_token_account(user_token_account)
+        .pending_vault(pending_vault_pubkey)
+        .asset_token_program(spl_token::ID)
+        .args(RequestArgs {
+            amount: 1_000_000,
+            operator: None,
+        })
+        .instruction()
+        .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair]);
+
+    assert_error_code(
+        &result.unwrap_err(),
+        expected_error_code,
+        expected_error_name,
+    );
+}
+
+#[test_case(Some(1), 1_000_000, INVALID_ASSET_MINT_EXTENSIONS ; "deposit_request_with_nonzero_transfer_fee_fails")]
+#[test_case(None, 0, INSUFFICIENT_DEPOSIT_AMOUNT ; "zero_amount_deposit_fails")]
 fn test_create_deposit_request_fails(
     asset_transfer_fee: Option<u16>,
     deposit_amount: u64,
