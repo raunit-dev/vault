@@ -1,16 +1,47 @@
 use anchor_spl::{associated_token::get_associated_token_address_with_program_id, token};
 use async_vault_client::{
     lite::SendTransaction, sdk::program_id, CancelRequestBuilder, CreateDepositRequestBuilder,
-    CreateRedeemRequestBuilder, InitializeVaultBuilder as InitializeAsyncVaultBuilder, RequestArgs,
-    UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder, Vault,
+    CreateRedeemRequestBuilder, InitializeVaultBuilder as InitializeAsyncVaultBuilder, Request,
+    RequestArgs, RequestState, UpdateVaultBuilder as UpdateVaultAsyncBuilder,
+    UpdateVaultNavBuilder, Vault,
 };
+use borsh::BorshSerialize;
 use litesvm::LiteSVM;
-use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
+use solana_sdk::{account::ReadableAccount, pubkey::Pubkey, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
 use crate::async_helper_functions::{
     assert_error_code, create_ata, get_token_account_amount, set_share_balance, set_up_async_vault,
 };
+
+#[derive(Clone, Copy)]
+enum CancelDepositFailure {
+    RequestNotPending,
+    MissingRefundAccount,
+    PendingRequestsUnderflow,
+}
+
+fn set_request_state(svm: &mut LiteSVM, request_pubkey: Pubkey, state: RequestState) {
+    let mut account = svm.get_account(&request_pubkey).unwrap();
+    let mut request = Request::from_bytes(account.data()).unwrap();
+    request.request_state = state;
+    let mut buf = Vec::new();
+    request.serialize(&mut buf).unwrap();
+    account.data = buf;
+    svm.set_account(request_pubkey, account).unwrap();
+}
+
+fn set_vault_pending_async_requests(svm: &mut LiteSVM, vault_pubkey: Pubkey, count: u16) {
+    let mut account = svm.get_account(&vault_pubkey).unwrap();
+    let mut vault = Vault::from_bytes(account.data()).unwrap();
+    vault.pending_async_requests = count;
+    let mut buf = Vec::new();
+    vault.serialize(&mut buf).unwrap();
+    let tlv_bytes = account.data()[buf.len()..].to_vec();
+    buf.extend_from_slice(&tlv_bytes);
+    account.data = buf;
+    svm.set_account(vault_pubkey, account).unwrap();
+}
 
 #[test_case(1_000_000 ; "cancel deposit request refunds user")]
 #[test_case(1 ; "cancel minimum deposit succeeds")]
@@ -234,6 +265,106 @@ fn test_cancel_deposit_request_fails(wrong_user: bool) {
     }
 }
 
+#[test_case(CancelDepositFailure::RequestNotPending, 6018, "RequestIsNotPending" ; "request not pending")]
+#[test_case(CancelDepositFailure::MissingRefundAccount, 6020, "MissingRequiredAccount" ; "missing refund account")]
+#[test_case(CancelDepositFailure::PendingRequestsUnderflow, 6002, "ArithmeticError" ; "pending requests underflow")]
+fn test_cancel_deposit_request_negative(
+    failure: CancelDepositFailure,
+    expected_error_code: u32,
+    expected_error_name: &str,
+) {
+    let mut svm = LiteSVM::new();
+    let program_bytes = include_bytes!("../../../target/deploy/async_vault.so");
+    svm.add_program(program_id(), program_bytes).unwrap();
+
+    let user_amount = 1_000_000_000;
+    let (
+        authority,
+        _payer,
+        _mint_authority,
+        asset_mint,
+        share_mint,
+        user,
+        _operator,
+        _fee_recipient,
+        _reserve_pubkey,
+        vault_pubkey,
+        pending_vault_pubkey,
+        _fee_recipient_ata,
+        _user_share_account,
+    ) = set_up_async_vault(&mut svm, token::ID, Some(0), token::ID, user_amount);
+
+    InitializeAsyncVaultBuilder::new()
+        .authority(authority.pubkey())
+        .vault(vault_pubkey)
+        .instruction()
+        .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+        .expect("initialize vault should succeed");
+    UpdateVaultNavBuilder::new()
+        .authority(authority.pubkey())
+        .vault(vault_pubkey)
+        .updated_nav(100)
+        .instruction()
+        .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+        .expect("update nav should succeed");
+
+    let user_token_account = get_associated_token_address_with_program_id(
+        &user.pubkey(),
+        &asset_mint.pubkey(),
+        &token::ID,
+    );
+
+    let request_keypair = Keypair::new();
+    CreateDepositRequestBuilder::new()
+        .user(user.pubkey())
+        .asset_mint(asset_mint.pubkey())
+        .share_mint(share_mint.pubkey())
+        .request(request_keypair.pubkey())
+        .vault(vault_pubkey)
+        .user_token_account(user_token_account)
+        .pending_vault(pending_vault_pubkey)
+        .asset_token_program(spl_token::ID)
+        .args(RequestArgs {
+            amount: 1_000_000,
+            operator: None,
+        })
+        .instruction()
+        .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair])
+        .expect("deposit request should succeed");
+
+    if matches!(failure, CancelDepositFailure::RequestNotPending) {
+        set_request_state(&mut svm, request_keypair.pubkey(), RequestState::Claimable);
+    }
+
+    if matches!(failure, CancelDepositFailure::PendingRequestsUnderflow) {
+        set_vault_pending_async_requests(&mut svm, vault_pubkey, 0);
+    }
+
+    let user_token_account = if matches!(failure, CancelDepositFailure::MissingRefundAccount) {
+        None
+    } else {
+        Some(user_token_account)
+    };
+
+    let user_pubkey = user.pubkey();
+    let err = CancelRequestBuilder::new()
+        .user(user_pubkey)
+        .asset_mint(asset_mint.pubkey())
+        .share_mint(share_mint.pubkey())
+        .request(request_keypair.pubkey())
+        .vault(vault_pubkey)
+        .user_token_account(user_token_account)
+        .asset_pending_vault(Some(pending_vault_pubkey))
+        .asset_token_program(Some(token::ID))
+        .user_share_account(None)
+        .share_token_program(None)
+        .instruction()
+        .send_transaction(&mut svm, &user_pubkey, &[&user])
+        .unwrap_err();
+
+    assert_error_code(&err, expected_error_code, expected_error_name);
+}
+
 #[test_case(1_000_000_000 ; "cancel redeem request mints shares back")]
 #[test_case(500_000_000 ; "cancel partial redeem mints correct amount")]
 fn test_cancel_redeem_request(share_amount: u64) {
@@ -332,4 +463,83 @@ fn test_cancel_redeem_request(share_amount: u64) {
 
     let vault_after = Vault::from_bytes(svm.get_account(&vault_pubkey).unwrap().data()).unwrap();
     assert_eq!(vault_after.pending_async_requests, pending_before - 1);
+}
+
+#[test]
+fn test_cancel_redeem_request_missing_mint_back_account_fails() {
+    let mut svm = LiteSVM::new();
+    let program_bytes = include_bytes!("../../../target/deploy/async_vault.so");
+    svm.add_program(program_id(), program_bytes).unwrap();
+
+    let (
+        authority,
+        _payer,
+        _mint_authority,
+        asset_mint,
+        share_mint,
+        user,
+        _operator,
+        _fee_recipient,
+        _reserve_pubkey,
+        vault_pubkey,
+        _pending_vault_pubkey,
+        _fee_recipient_ata,
+        user_share_account,
+    ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 0);
+
+    InitializeAsyncVaultBuilder::new()
+        .authority(authority.pubkey())
+        .vault(vault_pubkey)
+        .instruction()
+        .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+        .expect("initialize vault should succeed");
+    UpdateVaultNavBuilder::new()
+        .authority(authority.pubkey())
+        .vault(vault_pubkey)
+        .updated_nav(100)
+        .instruction()
+        .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+        .expect("update nav should succeed");
+
+    set_share_balance(
+        &mut svm,
+        &user_share_account,
+        &share_mint.pubkey(),
+        1_000_000,
+    );
+
+    let request_keypair = Keypair::new();
+    CreateRedeemRequestBuilder::new()
+        .user(user.pubkey())
+        .asset_mint(asset_mint.pubkey())
+        .share_mint(share_mint.pubkey())
+        .request(request_keypair.pubkey())
+        .vault(vault_pubkey)
+        .user_share_account(user_share_account)
+        .share_token_program(spl_token::ID)
+        .args(RequestArgs {
+            amount: 1_000_000,
+            operator: None,
+        })
+        .instruction()
+        .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair])
+        .expect("redeem request should succeed");
+
+    let user_pubkey = user.pubkey();
+    let err = CancelRequestBuilder::new()
+        .user(user_pubkey)
+        .asset_mint(asset_mint.pubkey())
+        .share_mint(share_mint.pubkey())
+        .request(request_keypair.pubkey())
+        .vault(vault_pubkey)
+        .user_token_account(None)
+        .asset_pending_vault(None)
+        .asset_token_program(None)
+        .user_share_account(None)
+        .share_token_program(Some(token::ID))
+        .instruction()
+        .send_transaction(&mut svm, &user_pubkey, &[&user])
+        .unwrap_err();
+
+    assert_error_code(&err, 6020, "MissingRequiredAccount");
 }
