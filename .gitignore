@@ -2,9 +2,23 @@
 .DS_Store
 target
 **/*.rs.bk
+
+# Javascript / Typescript
 node_modules
+**/dist/
+
+# Generated clients (regenerate from idl/ with `just generate-clients`)
+**/generated/
+
+# Solana
 test-ledger
+/keypairs
+.keypairs/
+
+# Tooling
 .yarn
 .agents
 .claude
+.remember
 skills-lock.json
+.env*.local
