@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     self, Mint, MintTo, TokenAccount, TokenInterface, TransferChecked,
 };
-use vault_common::VaultProgramError;
 
 use crate::{
     error::AsyncVaultError,
@@ -18,10 +17,10 @@ use crate::{
 pub struct RejectRequest<'info> {
     pub authority: Signer<'info>,
 
-    pub asset_mint: InterfaceAccount<'info, Mint>,
+    pub asset_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(mut)]
-    pub share_mint: InterfaceAccount<'info, Mint>,
+    pub share_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         mut,
@@ -50,7 +49,7 @@ pub struct RejectRequest<'info> {
         token::mint = asset_mint.key(),
         token::authority = user
     )]
-    pub user_token_account: Option<InterfaceAccount<'info, TokenAccount>>,
+    pub user_token_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
     #[account(
         mut,
@@ -59,7 +58,7 @@ pub struct RejectRequest<'info> {
         token::token_program = asset_token_program,
         constraint = vault.pending_vault.key() == asset_pending_vault.key() @ AsyncVaultError::InvalidPendingVault
     )]
-    pub asset_pending_vault: Option<InterfaceAccount<'info, TokenAccount>>,
+    pub asset_pending_vault: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
     #[account(
         mut,
@@ -67,7 +66,7 @@ pub struct RejectRequest<'info> {
         token::authority = user,
         token::token_program = share_token_program,
     )]
-    pub user_share_account: Option<InterfaceAccount<'info, TokenAccount>>,
+    pub user_share_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
     pub share_token_program: Option<Interface<'info, TokenInterface>>,
     pub asset_token_program: Option<Interface<'info, TokenInterface>>,
@@ -99,8 +98,7 @@ impl<'info> RejectRequest<'info> {
 
         let share_mint = self.share_mint.key();
         let seeds: &[&[&[u8]]] = &[&[VAULT_CONFIG_SEED, share_mint.as_ref(), &[self.vault.bump]]];
-        let cpi_ctx =
-            CpiContext::new_with_signer(asset_token_program.to_account_info(), cpi_accounts, seeds);
+        let cpi_ctx = CpiContext::new_with_signer(asset_token_program.key(), cpi_accounts, seeds);
         token_interface::transfer_checked(cpi_ctx, amount, self.asset_mint.decimals)
     }
 
@@ -141,8 +139,7 @@ impl<'info> RejectRequest<'info> {
 
         let share_mint = self.share_mint.key();
         let seeds: &[&[&[u8]]] = &[&[VAULT_CONFIG_SEED, share_mint.as_ref(), &[self.vault.bump]]];
-        let cpi_ctx =
-            CpiContext::new_with_signer(share_token_program.to_account_info(), cpi_accounts, seeds);
+        let cpi_ctx = CpiContext::new_with_signer(share_token_program.key(), cpi_accounts, seeds);
         token_interface::mint_to(cpi_ctx, amount)
     }
 }
@@ -174,7 +171,7 @@ pub fn handler(ctx: Context<RejectRequest>) -> Result<()> {
         .vault
         .pending_async_requests
         .checked_sub(1)
-        .ok_or(VaultProgramError::ArithmeticError)?;
+        .ok_or(AsyncVaultError::ArithmeticError)?;
 
     Ok(())
 }

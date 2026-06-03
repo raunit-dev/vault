@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
-use vault_common::VaultProgramError;
 
 use crate::{
     error::AsyncVaultError,
@@ -73,7 +72,7 @@ impl<'info> ApproveRequest<'info> {
     ) -> Result<()> {
         token_interface::transfer_checked(
             CpiContext::new_with_signer(
-                self.asset_token_program.to_account_info(),
+                self.asset_token_program.key(),
                 TransferChecked {
                     from: self.pending_vault.to_account_info(),
                     mint: self.asset_mint.to_account_info(),
@@ -96,7 +95,7 @@ impl<'info> ApproveRequest<'info> {
     ) -> Result<()> {
         token_interface::transfer_checked(
             CpiContext::new_with_signer(
-                self.asset_token_program.to_account_info(),
+                self.asset_token_program.key(),
                 TransferChecked {
                     from: self.vault_token_account.to_account_info(),
                     mint: self.asset_mint.to_account_info(),
@@ -127,14 +126,14 @@ impl<'info> ApproveRequest<'info> {
     }
 }
 
-pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, ApproveRequest<'info>>) -> Result<()> {
+pub fn handler<'info>(ctx: Context<'info, ApproveRequest<'info>>) -> Result<()> {
     ctx.accounts.vault.assert_unpaused_and_initialized()?;
 
     require!(
         matches!(ctx.accounts.request.request_state, RequestState::Pending),
         AsyncVaultError::RequestNotPending
     );
-    require!(ctx.accounts.vault.nav > 0, VaultProgramError::NavIsNotSet);
+    require!(ctx.accounts.vault.nav > 0, AsyncVaultError::NavIsNotSet);
 
     let nav = ctx.accounts.vault.nav;
     let decimals = ctx.accounts.share_mint.decimals;
