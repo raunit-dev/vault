@@ -78,6 +78,12 @@ pub enum AsyncVaultError {
     NavIsNotSet,
     #[msg("Redeem shares amount too small.")]
     InsufficientRedeemAmount,
+    #[msg("Approval does not match the live request instance.")]
+    ApprovalRequestMismatch,
+    #[msg("Deposit amount too small.")]
+    InsufficientDepositAmount,
+    #[msg("Share mint has invalid extensions.")]
+    InvalidShareMintExtensions,
 }
 
 impl From<vault_common::VaultMathError> for AsyncVaultError {
