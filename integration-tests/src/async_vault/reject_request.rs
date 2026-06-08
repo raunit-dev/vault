@@ -12,6 +12,9 @@ use crate::async_helper_functions::{
     approve_request_args, assert_error_code, get_token_account_amount, set_share_balance,
     set_up_async_vault,
 };
+use crate::async_vault::constants::{
+    APPROVAL_REQUEST_MISMATCH, MISSING_REQUIRED_ACCOUNT, REQUEST_INVALID_STATE, UNAUTHORIZED_SIGNER,
+};
 
 #[derive(Clone, Copy)]
 enum RejectDepositFailure {
@@ -239,10 +242,10 @@ fn test_reject_redeem_request(share_amount: u64) {
     assert_eq!(vault_after.pending_async_requests, pending_before - 1);
 }
 
-#[test_case(RejectDepositFailure::WrongAuthority, 6001, "UnauthorizedSigner" ; "wrong_authority")]
-#[test_case(RejectDepositFailure::WrongUser, 6001, "UnauthorizedSigner" ; "wrong_user")]
-#[test_case(RejectDepositFailure::ClaimableRequest, 6017, "RequestInvalidState" ; "claimable_request")]
-#[test_case(RejectDepositFailure::MissingRequiredAccounts, 6020, "MissingRequiredAccount" ; "missing_required_accounts")]
+#[test_case(RejectDepositFailure::WrongAuthority, UNAUTHORIZED_SIGNER, "UnauthorizedSigner" ; "wrong_authority")]
+#[test_case(RejectDepositFailure::WrongUser, UNAUTHORIZED_SIGNER, "UnauthorizedSigner" ; "wrong_user")]
+#[test_case(RejectDepositFailure::ClaimableRequest, REQUEST_INVALID_STATE, "RequestInvalidState" ; "claimable_request")]
+#[test_case(RejectDepositFailure::MissingRequiredAccounts, MISSING_REQUIRED_ACCOUNT, "MissingRequiredAccount" ; "missing_required_accounts")]
 fn test_reject_deposit_request_fails(
     failure: RejectDepositFailure,
     expected_error_code: u32,
@@ -466,12 +469,11 @@ fn test_reject_redeem_request_missing_required_accounts_fails() {
         .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
         .unwrap_err();
 
-    assert_error_code(&err, 6020, "MissingRequiredAccount");
+    assert_error_code(&err, MISSING_REQUIRED_ACCOUNT, "MissingRequiredAccount");
 }
 
 #[test]
 fn test_reject_rejects_mismatched_request_args() {
-    const APPROVAL_REQUEST_MISMATCH: u32 = 6038;
     let user_amount = 1_000_000_000;
     let deposit_amount = 1_000_000;
 
