@@ -7,7 +7,10 @@ use async_vault_client::{
 use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 
-use crate::async_helper_functions::{assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_up_async_vault},
+    async_vault::constants::UNAUTHORIZED_SIGNER,
+};
 
 #[test]
 fn test_set_operator_succeeds() {
@@ -110,6 +113,7 @@ fn test_set_operator_unauthorized_user_fails() {
     ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 1_000_000_000);
 
     InitializeAsyncVaultBuilder::new()
+        .share_mint(share_mint.pubkey())
         .authority(authority.pubkey())
         .vault(vault_pubkey)
         .instruction()
@@ -158,5 +162,5 @@ fn test_set_operator_unauthorized_user_fails() {
         .send_transaction(&mut svm, &attacker.pubkey(), &[&attacker, &operator])
         .unwrap_err();
 
-    assert_error_code(&err, 6001, "UnauthorizedSigner");
+    assert_error_code(&err, UNAUTHORIZED_SIGNER, "UnauthorizedSigner");
 }
