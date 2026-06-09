@@ -128,7 +128,7 @@ pub fn assert_error_code(
     let error_string = format!("{:?}", tx_result);
     assert!(
         error_string.contains(&format!("Custom({})", expected_code))
-            || error_string.contains(error_name),
+            || (!error_name.is_empty() && error_string.contains(error_name)),
         "Expected error code {} ({}), got: {:?}",
         expected_code,
         error_name,
