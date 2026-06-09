@@ -10,8 +10,15 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, pubkey::Pubkey, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    assert_error_code, create_ata, get_token_account_amount, set_share_balance, set_up_async_vault,
+use crate::{
+    async_helper_functions::{
+        assert_error_code, create_ata, get_token_account_amount, set_share_balance,
+        set_up_async_vault,
+    },
+    async_vault::constants::{
+        ARITHMETIC_ERROR, MISSING_REQUIRED_ACCOUNT, PAUSED_VAULT, REQUEST_IS_NOT_PENDING,
+        UNAUTHORIZED_SIGNER,
+    },
 };
 
 #[derive(Clone, Copy)]
@@ -27,6 +34,8 @@ fn set_request_state(svm: &mut LiteSVM, request_pubkey: Pubkey, state: RequestSt
     request.request_state = state;
     let mut buf = Vec::new();
     request.serialize(&mut buf).unwrap();
+    let tlv_bytes = account.data()[buf.len()..].to_vec();
+    buf.extend_from_slice(&tlv_bytes);
     account.data = buf;
     svm.set_account(request_pubkey, account).unwrap();
 }
@@ -259,15 +268,15 @@ fn test_cancel_deposit_request_fails(wrong_user: bool) {
         .unwrap_err();
 
     if wrong_user {
-        assert_error_code(&err, 6001, "UnauthorizedSigner");
+        assert_error_code(&err, UNAUTHORIZED_SIGNER, "UnauthorizedSigner");
     } else {
-        assert_error_code(&err, 6003, "PausedVault");
+        assert_error_code(&err, PAUSED_VAULT, "PausedVault");
     }
 }
 
-#[test_case(CancelDepositFailure::RequestNotPending, 6018, "RequestIsNotPending" ; "request not pending")]
-#[test_case(CancelDepositFailure::MissingRefundAccount, 6020, "MissingRequiredAccount" ; "missing refund account")]
-#[test_case(CancelDepositFailure::PendingRequestsUnderflow, 6002, "ArithmeticError" ; "pending requests underflow")]
+#[test_case(CancelDepositFailure::RequestNotPending, REQUEST_IS_NOT_PENDING, "RequestIsNotPending" ; "request not pending")]
+#[test_case(CancelDepositFailure::MissingRefundAccount, MISSING_REQUIRED_ACCOUNT, "MissingRequiredAccount" ; "missing refund account")]
+#[test_case(CancelDepositFailure::PendingRequestsUnderflow, ARITHMETIC_ERROR, "ArithmeticError" ; "pending requests underflow")]
 fn test_cancel_deposit_request_negative(
     failure: CancelDepositFailure,
     expected_error_code: u32,
@@ -295,6 +304,7 @@ fn test_cancel_deposit_request_negative(
     ) = set_up_async_vault(&mut svm, token::ID, Some(0), token::ID, user_amount);
 
     InitializeAsyncVaultBuilder::new()
+        .share_mint(share_mint.pubkey())
         .authority(authority.pubkey())
         .vault(vault_pubkey)
         .instruction()
@@ -488,6 +498,7 @@ fn test_cancel_redeem_request_missing_mint_back_account_fails() {
     ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 0);
 
     InitializeAsyncVaultBuilder::new()
+        .share_mint(share_mint.pubkey())
         .authority(authority.pubkey())
         .vault(vault_pubkey)
         .instruction()
@@ -541,5 +552,5 @@ fn test_cancel_redeem_request_missing_mint_back_account_fails() {
         .send_transaction(&mut svm, &user_pubkey, &[&user])
         .unwrap_err();
 
-    assert_error_code(&err, 6020, "MissingRequiredAccount");
+    assert_error_code(&err, MISSING_REQUIRED_ACCOUNT, "MissingRequiredAccount");
 }
