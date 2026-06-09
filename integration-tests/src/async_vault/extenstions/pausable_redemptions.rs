@@ -9,7 +9,13 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, pubkey::Pubkey, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{assert_error_code, set_share_balance, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_share_balance, set_up_async_vault},
+    async_vault::constants::{
+        EXTENSION_ALREADY_INITIALIZED, REDEMPTIONS_PAUSED, UNAUTHORIZED_SIGNER,
+        UNINITIALIZED_EXTENSION, VAULT_ALREADY_INITIALIZED,
+    },
+};
 
 const NAV: u128 = 1_000_000_000;
 const SHARE_AMOUNT: u64 = 1_000_000_000;
@@ -140,8 +146,8 @@ fn test_initialize_pausable_redemptions_paused_false() {
     .expect("redeem should succeed when paused=false");
 }
 
-#[test_case(true, false, 6004, "VaultAlreadyInitialized" ; "after_vault_init")]
-#[test_case(false, true, 6005, "ExtensionAlreadyInitialized" ; "duplicate")]
+#[test_case(true, false, VAULT_ALREADY_INITIALIZED, "VaultAlreadyInitialized" ; "after_vault_init")]
+#[test_case(false, true, EXTENSION_ALREADY_INITIALIZED, "ExtensionAlreadyInitialized" ; "duplicate")]
 fn test_initialize_pausable_redemptions_fails(
     init_vault_first: bool,
     init_extension_first: bool,
@@ -230,11 +236,11 @@ fn test_update_paused_true_blocks_redeem() {
         SHARE_AMOUNT,
     )
     .unwrap_err();
-    assert_error_code(&err, 6028, "RedemptionsPaused");
+    assert_error_code(&err, REDEMPTIONS_PAUSED, "RedemptionsPaused");
 }
 
-#[test_case(false, false, 6006, "UninitializedExtension" ; "without_init")]
-#[test_case(true, true, 6001, "UnauthorizedSigner" ; "wrong_authority")]
+#[test_case(false, false, UNINITIALIZED_EXTENSION, "UninitializedExtension" ; "without_init")]
+#[test_case(true, true, UNAUTHORIZED_SIGNER, "UnauthorizedSigner" ; "wrong_authority")]
 fn test_update_pausable_redemptions_fails(
     init_extension: bool,
     use_wrong_signer: bool,

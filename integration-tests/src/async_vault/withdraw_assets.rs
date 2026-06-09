@@ -7,8 +7,11 @@ use litesvm::LiteSVM;
 use solana_sdk::{signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    assert_error_code, create_ata, get_token_account_amount, helper_mint_to, set_up_async_vault,
+use crate::{
+    async_helper_functions::{
+        assert_error_code, create_ata, get_token_account_amount, helper_mint_to, set_up_async_vault,
+    },
+    async_vault::constants::{PAUSED_VAULT, UNAUTHORIZED_SIGNER},
 };
 
 #[test_case(1_000_000, 500_000 ; "withdraw partial amount")]
@@ -150,7 +153,11 @@ fn test_withdraw_assets_fails(use_wrong_signer: bool, pause_vault: bool) {
 
     let signer = if use_wrong_signer { &user } else { &authority };
 
-    let expected_error_code = if use_wrong_signer { 6001 } else { 6003 };
+    let expected_error_code = if use_wrong_signer {
+        UNAUTHORIZED_SIGNER
+    } else {
+        PAUSED_VAULT
+    };
 
     let err = WithdrawAssetsBuilder::new()
         .authority(signer.pubkey())

@@ -7,7 +7,10 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_up_async_vault},
+    async_vault::constants::{UNAUTHORIZED_SIGNER, VAULT_ALREADY_INITIALIZED},
+};
 
 #[test_case(true, false ; "succeeds and preserves other fields")]
 #[test_case(true, true ; "already initialized fails")]
@@ -98,10 +101,14 @@ fn test_initialize_vault(use_valid_authority: bool, pre_initialize: bool) {
     } else {
         let err_result = &result.unwrap_err();
         if pre_initialize {
-            assert_error_code(err_result, 6004, "VaultAlreadyInitialized");
+            assert_error_code(
+                err_result,
+                VAULT_ALREADY_INITIALIZED,
+                "VaultAlreadyInitialized",
+            );
         }
         if !use_valid_authority {
-            assert_error_code(err_result, 6001, "UnauthorizedSigner");
+            assert_error_code(err_result, UNAUTHORIZED_SIGNER, "UnauthorizedSigner");
         }
     }
 }

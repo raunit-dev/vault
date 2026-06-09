@@ -10,7 +10,13 @@ use litesvm::{
 use solana_sdk::{account::ReadableAccount, pubkey::Pubkey, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_up_async_vault},
+    async_vault::constants::{
+        EXTENSION_ALREADY_INITIALIZED, FEE_BPS_EXCEEDED, UNAUTHORIZED_SIGNER,
+        UNINITIALIZED_EXTENSION,
+    },
+};
 
 #[derive(Clone, Copy)]
 enum FeeKind {
@@ -140,7 +146,11 @@ fn test_duplicate_init_fails(kind: FeeKind, fee: FeeType) {
     svm.expire_blockhash();
 
     let result = init_fee(&mut svm, &authority, vault_pubkey, fee, kind);
-    assert_error_code(&result.unwrap_err(), 6005, "ExtensionAlreadyInitialized");
+    assert_error_code(
+        &result.unwrap_err(),
+        EXTENSION_ALREADY_INITIALIZED,
+        "ExtensionAlreadyInitialized",
+    );
 }
 
 #[test_case(FeeKind::Deposit, FeeType::FixedAmount { amount: 100 } ; "deposit")]
@@ -149,7 +159,11 @@ fn test_update_before_init_fails(kind: FeeKind, fee: FeeType) {
     let (mut svm, authority, _share_mint, vault_pubkey) = setup_vault();
 
     let result = update_fee(&mut svm, &authority, vault_pubkey, fee, kind);
-    assert_error_code(&result.unwrap_err(), 6006, "UninitializedExtension");
+    assert_error_code(
+        &result.unwrap_err(),
+        UNINITIALIZED_EXTENSION,
+        "UninitializedExtension",
+    );
 }
 
 #[test_case(FeeKind::Deposit ; "deposit")]
@@ -159,7 +173,7 @@ fn test_invalid_bps_init_fails(kind: FeeKind) {
 
     let fee = FeeType::Percentage { bps: 10_001 };
     let result = init_fee(&mut svm, &authority, vault_pubkey, fee, kind);
-    assert_error_code(&result.unwrap_err(), 6008, "FeeBpsExceeded");
+    assert_error_code(&result.unwrap_err(), FEE_BPS_EXCEEDED, "FeeBpsExceeded");
 }
 
 #[test]
@@ -177,7 +191,11 @@ fn test_initialize_fee_unauthorized_signer_fails() {
         .deposit_fee(deposit_fee)
         .instruction()
         .send_transaction(&mut svm, &unauthorized.pubkey(), &[&unauthorized]);
-    assert_error_code(&result.unwrap_err(), 6001, "UnauthorizedSigner");
+    assert_error_code(
+        &result.unwrap_err(),
+        UNAUTHORIZED_SIGNER,
+        "UnauthorizedSigner",
+    );
 }
 
 #[test]
@@ -204,5 +222,9 @@ fn test_update_fee_unauthorized_signer_fails() {
         .new_deposit_fee(new_fee)
         .instruction()
         .send_transaction(&mut svm, &unauthorized.pubkey(), &[&unauthorized]);
-    assert_error_code(&result.unwrap_err(), 6001, "UnauthorizedSigner");
+    assert_error_code(
+        &result.unwrap_err(),
+        UNAUTHORIZED_SIGNER,
+        "UnauthorizedSigner",
+    );
 }

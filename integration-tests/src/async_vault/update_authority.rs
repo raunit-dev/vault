@@ -7,7 +7,10 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_up_async_vault},
+    async_vault::constants::{NO_PENDING_AUTHORITY, UNAUTHORIZED_SIGNER},
+};
 
 #[test_case(true ; "succeeds")]
 #[test_case(false ; "unauthorized signer fails")]
@@ -61,7 +64,11 @@ fn test_invite_new_authority(use_valid_authority: bool) {
         let vault_data = Vault::from_bytes(vault_account.data()).unwrap();
         assert_eq!(vault_data.pending_authority, Some(new_authority.pubkey()));
     } else {
-        assert_error_code(&result.unwrap_err(), 6001, "UnauthorizedSigner");
+        assert_error_code(
+            &result.unwrap_err(),
+            UNAUTHORIZED_SIGNER,
+            "UnauthorizedSigner",
+        );
     }
 }
 
@@ -185,9 +192,9 @@ fn test_accept_authority_invitation(invite_first: bool, use_correct_new_authorit
     } else {
         let err = result.unwrap_err();
         if !invite_first {
-            assert_error_code(&err, 6012, "NoPendingAuthority");
+            assert_error_code(&err, NO_PENDING_AUTHORITY, "NoPendingAuthority");
         } else {
-            assert_error_code(&err, 6001, "UnauthorizedSigner");
+            assert_error_code(&err, UNAUTHORIZED_SIGNER, "UnauthorizedSigner");
         }
     }
 }
@@ -243,7 +250,11 @@ fn test_full_authority_transfer_old_authority_loses_access() {
         .new_authority(another.pubkey())
         .instruction()
         .send_transaction(&mut svm, &authority.pubkey(), &[&authority]);
-    assert_error_code(&result.unwrap_err(), 6001, "UnauthorizedSigner");
+    assert_error_code(
+        &result.unwrap_err(),
+        UNAUTHORIZED_SIGNER,
+        "UnauthorizedSigner",
+    );
 
     svm.expire_blockhash();
 

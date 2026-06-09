@@ -9,9 +9,12 @@ use litesvm::LiteSVM;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    approve_request_args, assert_error_code, get_mint_supply, get_token_account_amount,
-    helper_mint_to, set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
+use crate::{
+    async_helper_functions::{
+        approve_request_args, assert_error_code, get_mint_supply, get_token_account_amount,
+        helper_mint_to, set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
+    },
+    async_vault::constants::{PAUSED_VAULT, REQUEST_NOT_CLAIMABLE, UNAUTHORIZED_SIGNER},
 };
 
 const LITESVM_TX_COST: u64 = 5000;
@@ -344,9 +347,9 @@ fn test_claim_redeem_success(
     );
 }
 
-#[test_case(true,  false, false, 1_000_000, 6001 ; "unauthorized signer")]
-#[test_case(false, true,  false, 1_000_000, 6003 ; "paused vault")]
-#[test_case(false, false, true,  1_000_000, 6022 ; "request not claimable")]
+#[test_case(true,  false, false, 1_000_000, UNAUTHORIZED_SIGNER ; "unauthorized signer")]
+#[test_case(false, true,  false, 1_000_000, PAUSED_VAULT ; "paused vault")]
+#[test_case(false, false, true,  1_000_000, REQUEST_NOT_CLAIMABLE ; "request not claimable")]
 fn test_claim_fails(
     use_wrong_signer: bool,
     pause_vault: bool,

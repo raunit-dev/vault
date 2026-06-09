@@ -12,9 +12,12 @@ use solana_sdk::{
 };
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    approve_request_args, assert_error_code, get_token_account_amount, helper_mint_to,
-    set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
+use crate::{
+    async_helper_functions::{
+        approve_request_args, assert_error_code, get_token_account_amount, helper_mint_to,
+        set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
+    },
+    async_vault::constants::{INSUFFICIENT_DEPOSIT_AMOUNT, MISSING_FEE_RECIPIENT},
 };
 
 // NAV: 200_000_000_000 with 9 decimals → shares = assets/200, assets = shares*200
@@ -532,7 +535,7 @@ fn test_approve_fee_missing_remaining_account_fails(is_deposit: bool) {
         svm.latest_blockhash(),
     );
     let err = svm.send_transaction(tx).unwrap_err();
-    assert_error_code(&err, 6015, "MissingFeeRecipient");
+    assert_error_code(&err, MISSING_FEE_RECIPIENT, "MissingFeeRecipient");
 }
 
 #[test]
@@ -574,5 +577,9 @@ fn test_create_deposit_below_fixed_fee_rejected() {
         .instruction()
         .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair])
         .unwrap_err();
-    assert_error_code(&err, 6039, "Deposit amount too small.");
+    assert_error_code(
+        &err,
+        INSUFFICIENT_DEPOSIT_AMOUNT,
+        "Deposit amount too small.",
+    );
 }

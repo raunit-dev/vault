@@ -15,9 +15,15 @@ use solana_sdk::{
 };
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    approve_request_args, assert_error_code, get_token_account_amount, helper_mint_to,
-    set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
+use crate::{
+    async_helper_functions::{
+        approve_request_args, assert_error_code, get_token_account_amount, helper_mint_to,
+        set_share_balance, set_up_async_vault, set_vault_total_asset_balance,
+    },
+    async_vault::constants::{
+        APPROVAL_REQUEST_MISMATCH, INSUFFICIENT_DEPOSIT_AMOUNT, INVALID_ASSET_MINT_EXTENSIONS,
+        NAV_IS_NOT_SET, PAUSED_VAULT, REQUEST_NOT_PENDING, UNAUTHORIZED_SIGNER,
+    },
 };
 
 fn setup(
@@ -306,10 +312,10 @@ fn test_approve_redeem_request_success(nav: u128, redeem_amount: u64, expected_r
     );
 }
 
-#[test_case(false, true, false, 1_000_000, 6001 ; "unauthorized signer")]
-#[test_case(true, false, false, 1_000_000, 6003 ; "paused vault")]
-#[test_case(false, false, true, 1_000_000, 6021 ; "request not in pending state")]
-#[test_case(false, false, false, 1_000_000, 6029 ; "nav not set")]
+#[test_case(false, true, false, 1_000_000, UNAUTHORIZED_SIGNER ; "unauthorized signer")]
+#[test_case(true, false, false, 1_000_000, PAUSED_VAULT ; "paused vault")]
+#[test_case(false, false, true, 1_000_000, REQUEST_NOT_PENDING ; "request not in pending state")]
+#[test_case(false, false, false, 1_000_000, NAV_IS_NOT_SET ; "nav not set")]
 fn test_approve_request_fails(
     pause_vault: bool,
     use_wrong_signer: bool,
@@ -427,7 +433,6 @@ fn test_approve_request_fails(
 #[test]
 fn test_stale_approval_rejected_on_recreated_request() {
     const NAV: u128 = 200_000_000_000;
-    const APPROVAL_REQUEST_MISMATCH: u32 = 6038;
     let original_amount = 1_000_000u64;
     let replacement_amount = 600_000u64;
 
@@ -560,7 +565,6 @@ fn test_approve_rejected_when_transfer_fee_reenabled() {
     const DEPOSIT_AMOUNT: u64 = 1_000_000;
     const NAV: u128 = 1_000_000_000;
     const FEE_BPS: u16 = 100;
-    const INVALID_ASSET_MINT_EXTENSIONS: u32 = 6021;
 
     let mut svm = LiteSVM::new();
     let program_bytes = include_bytes!("../../../target/deploy/async_vault.so");
@@ -671,7 +675,6 @@ fn test_approve_rejected_when_transfer_fee_reenabled() {
 fn test_approve_deposit_rejected_when_shares_round_to_zero() {
     const NAV: u128 = 200_000_000_000;
     const DUST_DEPOSIT: u64 = 1;
-    const INSUFFICIENT_DEPOSIT_AMOUNT: u32 = 6039;
 
     let mut svm = LiteSVM::new();
     let program_bytes = include_bytes!("../../../target/deploy/async_vault.so");
