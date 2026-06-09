@@ -5,7 +5,10 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_up_async_vault},
+    async_vault::constants::{ARITHMETIC_ERROR, UNAUTHORIZED_SIGNER},
+};
 
 #[test_case(200 ; "update nav succeeds")]
 #[test_case(0 ; "update nav to zero succeeds")]
@@ -88,7 +91,11 @@ fn test_update_vault_nav_unauthorized_signer_fails() {
         .instruction()
         .send_transaction(&mut svm, &unauthorized.pubkey(), &[&unauthorized]);
 
-    assert_error_code(&result.unwrap_err(), 6001, "UnauthorizedSigner");
+    assert_error_code(
+        &result.unwrap_err(),
+        UNAUTHORIZED_SIGNER,
+        "UnauthorizedSigner",
+    );
 }
 
 #[test]
@@ -118,6 +125,8 @@ fn test_update_vault_nav_version_overflow_fails() {
     vault.nav_version = u64::MAX;
     let mut buf = Vec::new();
     vault.serialize(&mut buf).unwrap();
+    let tlv_bytes = account.data()[buf.len()..].to_vec();
+    buf.extend_from_slice(&tlv_bytes);
     account.data = buf;
     svm.set_account(vault_pubkey, account).unwrap();
 
@@ -128,5 +137,5 @@ fn test_update_vault_nav_version_overflow_fails() {
         .instruction()
         .send_transaction(&mut svm, &authority.pubkey(), &[&authority]);
 
-    assert_error_code(&result.unwrap_err(), 6002, "ArithmeticError");
+    assert_error_code(&result.unwrap_err(), ARITHMETIC_ERROR, "ArithmeticError");
 }
