@@ -2,7 +2,7 @@ use anchor_spl::token;
 use async_vault_client::{
     lite::SendTransaction, sdk::program_id, CreateRedeemRequestBuilder,
     InitializeVaultBuilder as InitializeAsyncVaultBuilder, Request, RequestArgs, RequestState,
-    RequestType, UpdateVaultNavBuilder,
+    RequestType, UpdateVaultBuilder as UpdateVaultAsyncBuilder, UpdateVaultNavBuilder,
 };
 use litesvm::LiteSVM;
 use solana_sdk::{
@@ -10,13 +10,26 @@ use solana_sdk::{
 };
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    assert_error_code, get_token_account_amount, set_share_balance, set_up_async_vault,
+use crate::{
+    async_helper_functions::{
+        assert_error_code, get_token_account_amount, set_share_balance, set_up_async_vault,
+        set_vault_pending_async_requests,
+    },
+    async_vault::constants::{
+        ARITHMETIC_ERROR, INSUFFICIENT_REDEEM_AMOUNT, PAUSED_VAULT, UNINITIALIZED_VAULT,
+    },
 };
+
+#[derive(Clone, Copy)]
+enum CreateRedeemRequestFailure {
+    UninitializedVault,
+    PausedVault,
+    PendingRequestsOverflow,
+}
 
 #[test_case(1_000_000_000, false, None ; "redeem request succeeds")]
 #[test_case(1_000_000_000, true, None ; "redeem with operator succeeds")]
-#[test_case(0, false, Some((6011, "InsufficientRedeemAmount")) ; "zero amount fails")]
+#[test_case(0, false, Some((INSUFFICIENT_REDEEM_AMOUNT, "InsufficientRedeemAmount")) ; "zero amount fails")]
 fn test_create_redeem_request(
     share_amount: u64,
     with_operator: bool,
@@ -122,5 +135,88 @@ fn test_create_redeem_request(
     assert_eq!(
         get_token_account_amount(&svm.get_account(&user_share_account).unwrap()),
         0
+    );
+}
+
+#[test_case(CreateRedeemRequestFailure::UninitializedVault, UNINITIALIZED_VAULT, "UninitializedVault" ; "uninitialized vault")]
+#[test_case(CreateRedeemRequestFailure::PausedVault, PAUSED_VAULT, "PausedVault" ; "paused vault")]
+#[test_case(CreateRedeemRequestFailure::PendingRequestsOverflow, ARITHMETIC_ERROR, "ArithmeticError" ; "pending requests overflow")]
+fn test_create_redeem_request_negative(
+    failure: CreateRedeemRequestFailure,
+    expected_error_code: u32,
+    expected_error_name: &str,
+) {
+    let mut svm = LiteSVM::new();
+    let program_bytes = include_bytes!("../../../target/deploy/async_vault.so");
+    svm.add_program(program_id(), program_bytes).unwrap();
+
+    let (
+        authority,
+        _payer,
+        _mint_authority,
+        asset_mint,
+        share_mint,
+        user,
+        _operator,
+        _fee_recipient,
+        _reserve_pubkey,
+        vault_pubkey,
+        _pending_vault_pubkey,
+        _fee_recipient_ata,
+        user_share_account,
+    ) = set_up_async_vault(&mut svm, token::ID, None, token::ID, 0);
+
+    if !matches!(failure, CreateRedeemRequestFailure::UninitializedVault) {
+        InitializeAsyncVaultBuilder::new()
+            .share_mint(share_mint.pubkey())
+            .authority(authority.pubkey())
+            .vault(vault_pubkey)
+            .instruction()
+            .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+            .expect("initialize vault should succeed");
+    }
+
+    if matches!(failure, CreateRedeemRequestFailure::PausedVault) {
+        UpdateVaultAsyncBuilder::new()
+            .authority(authority.pubkey())
+            .share_mint(share_mint.pubkey())
+            .paused(true)
+            .vault(vault_pubkey)
+            .instruction()
+            .send_transaction(&mut svm, &authority.pubkey(), &[&authority])
+            .expect("pause vault should succeed");
+    }
+
+    if matches!(failure, CreateRedeemRequestFailure::PendingRequestsOverflow) {
+        set_vault_pending_async_requests(&mut svm, vault_pubkey, u16::MAX);
+    }
+
+    set_share_balance(
+        &mut svm,
+        &user_share_account,
+        &share_mint.pubkey(),
+        1_000_000,
+    );
+
+    let request_keypair = Keypair::new();
+    let result = CreateRedeemRequestBuilder::new()
+        .user(user.pubkey())
+        .asset_mint(asset_mint.pubkey())
+        .share_mint(share_mint.pubkey())
+        .request(request_keypair.pubkey())
+        .vault(vault_pubkey)
+        .user_share_account(user_share_account)
+        .share_token_program(spl_token::ID)
+        .args(RequestArgs {
+            amount: 1_000_000,
+            operator: None,
+        })
+        .instruction()
+        .send_transaction(&mut svm, &user.pubkey(), &[&user, &request_keypair]);
+
+    assert_error_code(
+        &result.unwrap_err(),
+        expected_error_code,
+        expected_error_name,
     );
 }
