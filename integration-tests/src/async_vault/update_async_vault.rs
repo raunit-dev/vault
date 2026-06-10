@@ -6,7 +6,10 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{assert_error_code, set_up_async_vault},
+    async_vault::constants::UNAUTHORIZED_SIGNER,
+};
 
 #[test_case(Some(true), false; "pause vault")]
 #[test_case(Some(false), false; "unpause vault")]
@@ -109,5 +112,9 @@ fn test_update_async_vault_unauthorized_signer_fails() {
         .instruction()
         .send_transaction(&mut svm, &unauthorized.pubkey(), &[&unauthorized]);
 
-    assert_error_code(&result.unwrap_err(), 6001, "UnauthorizedSigner");
+    assert_error_code(
+        &result.unwrap_err(),
+        UNAUTHORIZED_SIGNER,
+        "UnauthorizedSigner",
+    );
 }

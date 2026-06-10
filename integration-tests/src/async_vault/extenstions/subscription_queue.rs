@@ -10,7 +10,13 @@ use litesvm::LiteSVM;
 use solana_sdk::{account::ReadableAccount, pubkey::Pubkey, signature::Keypair, signer::Signer};
 use test_case::test_case;
 
-use crate::async_helper_functions::{approve_request_args, assert_error_code, set_up_async_vault};
+use crate::{
+    async_helper_functions::{approve_request_args, assert_error_code, set_up_async_vault},
+    async_vault::constants::{
+        EXTENSION_ALREADY_INITIALIZED, MUST_USE_CANCEL_QUEUED_DEPOSIT_REQUEST,
+        SUBSCRIPTION_QUEUE_OUT_OF_ORDER, UNINITIALIZED_EXTENSION, VAULT_ALREADY_INITIALIZED,
+    },
+};
 
 const NAV: u128 = 1_000_000_000;
 
@@ -209,8 +215,8 @@ fn test_initialize_subscription_queue_state_is_zeroed() {
     );
 }
 
-#[test_case(true, false, 6004, "VaultAlreadyInitialized" ; "after_vault_init")]
-#[test_case(false, true, 6005, "ExtensionAlreadyInitialized" ; "duplicate")]
+#[test_case(true, false, VAULT_ALREADY_INITIALIZED, "VaultAlreadyInitialized" ; "after_vault_init")]
+#[test_case(false, true, EXTENSION_ALREADY_INITIALIZED, "ExtensionAlreadyInitialized" ; "duplicate")]
 fn test_initialize_subscription_queue_fails(
     init_vault_first: bool,
     init_extension_first: bool,
@@ -419,7 +425,11 @@ fn test_approve_request_out_of_order_fails() {
         request_2.pubkey(),
     )
     .unwrap_err();
-    assert_error_code(&err, 6029, "SubscriptionQueueOutOfOrder");
+    assert_error_code(
+        &err,
+        SUBSCRIPTION_QUEUE_OUT_OF_ORDER,
+        "SubscriptionQueueOutOfOrder",
+    );
 
     // Vault state must be unchanged
     let queue =
@@ -477,7 +487,11 @@ fn test_reject_request_out_of_order_fails() {
         user_token_account,
     )
     .unwrap_err();
-    assert_error_code(&err, 6029, "SubscriptionQueueOutOfOrder");
+    assert_error_code(
+        &err,
+        SUBSCRIPTION_QUEUE_OUT_OF_ORDER,
+        "SubscriptionQueueOutOfOrder",
+    );
 
     let queue =
         subscription_queue::get_state(svm.get_account(&vault_pubkey).unwrap().data()).unwrap();
@@ -910,9 +924,9 @@ fn test_cancel_middle_request_queue_unblocks_after_skip() {
 
 // ── Failure tests ─────────────────────────────────────────────────────────────
 
-#[test_case(true,  true,  6031, "MustUseCancelQueuedDepositRequest" ; "cancel_request_rejected_for_queued_deposit")]
-#[test_case(false, true,  6029, "SubscriptionQueueOutOfOrder"        ; "skip_out_of_order_fails")]
-#[test_case(false, false, 6006, "UninitializedExtension"             ; "cancel_queued_no_subscription_queue")]
+#[test_case(true,  true,  MUST_USE_CANCEL_QUEUED_DEPOSIT_REQUEST, "MustUseCancelQueuedDepositRequest" ; "cancel_request_rejected_for_queued_deposit")]
+#[test_case(false, true,  SUBSCRIPTION_QUEUE_OUT_OF_ORDER, "SubscriptionQueueOutOfOrder"        ; "skip_out_of_order_fails")]
+#[test_case(false, false, UNINITIALIZED_EXTENSION, "UninitializedExtension"             ; "cancel_queued_no_subscription_queue")]
 fn test_cancel_and_skip_failure_cases(
     use_cancel_request: bool,
     with_queue: bool,

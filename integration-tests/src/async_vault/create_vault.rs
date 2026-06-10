@@ -13,9 +13,15 @@ use solana_sdk::{
 use solana_system_interface::instruction::create_account;
 use test_case::test_case;
 
-use crate::async_helper_functions::{
-    assert_error_code, create_mint, create_mint_with_confidential_mint_burn,
-    create_mint_with_transfer_fee, PENDING_VAULT_SEED, RESERVE_CONFIG_SEED, VAULT_CONFIG_SEED,
+use crate::{
+    async_helper_functions::{
+        assert_error_code, create_mint, create_mint_with_confidential_mint_burn,
+        create_mint_with_transfer_fee, PENDING_VAULT_SEED, RESERVE_CONFIG_SEED, VAULT_CONFIG_SEED,
+    },
+    async_vault::constants::{
+        INVALID_ASSET_MINT_EXTENSIONS, INVALID_SHARE_MINT_EXTENSIONS, MINTS_SHOULD_BE_DIFFERENT,
+        SHARE_MINT_SUPPLY_SHOULD_BE_ZERO,
+    },
 };
 
 #[test_case(true, false, token::ID,token::ID, 0 ; "Token program for both mints")]
@@ -142,10 +148,18 @@ fn test_create_vault(
         }
 
         if use_same_mints {
-            assert_error_code(err_result, 6010, "Mints should be different.");
+            assert_error_code(
+                err_result,
+                MINTS_SHOULD_BE_DIFFERENT,
+                "Mints should be different.",
+            );
         }
         if asset_transfer_fee > 0 {
-            assert_error_code(err_result, 6016, "Asset mint has invalid extensions.");
+            assert_error_code(
+                err_result,
+                INVALID_ASSET_MINT_EXTENSIONS,
+                "Asset mint has invalid extensions.",
+            );
         }
     }
 }
@@ -238,7 +252,11 @@ fn test_create_vault_nonzero_share_mint_supply_fails() {
         .send_transaction(&mut svm, &payer.pubkey(), &[&payer, &mint_authority]);
 
     let err_result = &result.unwrap_err();
-    assert_error_code(err_result, 6011, "Share mint supply should be zero.");
+    assert_error_code(
+        err_result,
+        SHARE_MINT_SUPPLY_SHOULD_BE_ZERO,
+        "Share mint supply should be zero.",
+    );
 }
 
 #[test]
@@ -290,5 +308,9 @@ fn test_create_vault_confidential_mint_burn_share_mint_fails() {
         .send_transaction(&mut svm, &payer.pubkey(), &[&payer, &mint_authority]);
 
     let err = result.unwrap_err();
-    assert_error_code(&err, 6040, "Share mint has invalid extensions.");
+    assert_error_code(
+        &err,
+        INVALID_SHARE_MINT_EXTENSIONS,
+        "Share mint has invalid extensions.",
+    );
 }
